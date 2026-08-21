@@ -11,7 +11,6 @@ if (!fs.existsSync(dataDir)) {
 
 const db = new Database(path.join(dataDir, 'medieval2.db'));
 
-// Initialize tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS players (
     user_id TEXT PRIMARY KEY,
@@ -25,21 +24,56 @@ db.exec(`
     generals TEXT DEFAULT '[]',
     agents TEXT DEFAULT '[]',
     regions TEXT DEFAULT '{}',
+    political_power INTEGER DEFAULT 40,
+    stability INTEGER DEFAULT 60,
+    war_support INTEGER DEFAULT 50,
+    organization INTEGER DEFAULT 100,
+    skills TEXT DEFAULT '{}',
+    companions TEXT DEFAULT '[]',
+    active_focus TEXT DEFAULT NULL,
+    focus_turns_left INTEGER DEFAULT 0,
+    focus_effects TEXT DEFAULT '{}',
+    completed_focuses TEXT DEFAULT '[]',
+    caravan_cooldown INTEGER DEFAULT 0,
     last_active INTEGER,
     created_at INTEGER
   );
 `);
 
-// Migration: add regions column if missing (old DBs)
-try {
-  db.exec(`ALTER TABLE players ADD COLUMN regions TEXT DEFAULT '{}'`);
-} catch (_) {
-  // column already exists
+const extraColumns = [
+  ['political_power', 'INTEGER DEFAULT 40'],
+  ['stability', 'INTEGER DEFAULT 60'],
+  ['war_support', 'INTEGER DEFAULT 50'],
+  ['organization', 'INTEGER DEFAULT 100'],
+  ['skills', "TEXT DEFAULT '{}'"] ,
+  ['companions', "TEXT DEFAULT '[]'"],
+  ['active_focus', 'TEXT DEFAULT NULL'],
+  ['focus_turns_left', 'INTEGER DEFAULT 0'],
+  ['focus_effects', "TEXT DEFAULT '{}'"],
+  ['completed_focuses', "TEXT DEFAULT '[]'"],
+  ['caravan_cooldown', 'INTEGER DEFAULT 0'],
+  ['regions', "TEXT DEFAULT '{}'"]
+];
+
+for (const [col, def] of extraColumns) {
+  try {
+    db.exec(`ALTER TABLE players ADD COLUMN ${col} ${def}`);
+  } catch (_) {}
 }
 
-function getPlayer(userId) {
-  const row = db.prepare('SELECT * FROM players WHERE user_id = ?').get(userId);
+function defaultSkills() {
+  return { leadership: 1, stewardship: 1, prowess: 1, charm: 1 };
+}
+
+function parsePlayer(row) {
   if (!row) return null;
+  let skills;
+  try {
+    skills = JSON.parse(row.skills || '{}');
+  } catch {
+    skills = {};
+  }
+  if (!skills.leadership) skills = { ...defaultSkills(), ...skills };
 
   return {
     userId: row.user_id,
@@ -53,9 +87,25 @@ function getPlayer(userId) {
     generals: JSON.parse(row.generals || '[]'),
     agents: JSON.parse(row.agents || '[]'),
     regions: JSON.parse(row.regions || '{}'),
+    politicalPower: row.political_power ?? 40,
+    stability: row.stability ?? 60,
+    warSupport: row.war_support ?? 50,
+    organization: row.organization ?? 100,
+    skills,
+    companions: JSON.parse(row.companions || '[]'),
+    activeFocus: row.active_focus || null,
+    focusTurnsLeft: row.focus_turns_left || 0,
+    focusEffects: JSON.parse(row.focus_effects || '{}'),
+    completedFocuses: JSON.parse(row.completed_focuses || '[]'),
+    caravanCooldown: row.caravan_cooldown || 0,
     lastActive: row.last_active,
     createdAt: row.created_at
   };
+}
+
+function getPlayer(userId) {
+  const row = db.prepare('SELECT * FROM players WHERE user_id = ?').get(userId);
+  return parsePlayer(row);
 }
 
 function createPlayer(userId, factionKey) {
@@ -67,7 +117,6 @@ function createPlayer(userId, factionKey) {
     { unit: 'spear_militia', count: 2, experience: 0 },
     { unit: 'peasant_archers', count: 1, experience: 0 }
   ];
-
   const starterGeneral = [{
     name: 'Lord ' + Math.random().toString(36).substring(2, 7).toUpperCase(),
     command: 3,
@@ -75,12 +124,17 @@ function createPlayer(userId, factionKey) {
     dread: 0,
     loyalty: 5
   }];
-
   const regions = startingRegions(factionKey);
+  const skills = defaultSkills();
 
   db.prepare(`
-    INSERT INTO players (user_id, faction, florins, turn, population, settlement_level, buildings, army, generals, agents, regions, last_active, created_at)
-    VALUES (?, ?, ?, 1, 500, 'village', '[]', ?, ?, '[]', ?, ?, ?)
+    INSERT INTO players (
+      user_id, faction, florins, turn, population, settlement_level,
+      buildings, army, generals, agents, regions,
+      political_power, stability, war_support, organization,
+      skills, companions, active_focus, focus_turns_left, focus_effects,
+      completed_focuses, caravan_cooldown, last_active, created_at
+    ) VALUES (?, ?, ?, 1, 500, 'village', '[]', ?, ?, '[]', ?, 40, 60, 50, 100, ?, '[]', NULL, 0, '{}', '[]', 0, ?, ?)
   `).run(
     userId,
     factionKey,
@@ -88,6 +142,7 @@ function createPlayer(userId, factionKey) {
     JSON.stringify(starterArmy),
     JSON.stringify(starterGeneral),
     JSON.stringify(regions),
+    JSON.stringify(skills),
     now,
     now
   );
@@ -107,6 +162,17 @@ function savePlayer(player) {
       generals = ?,
       agents = ?,
       regions = ?,
+      political_power = ?,
+      stability = ?,
+      war_support = ?,
+      organization = ?,
+      skills = ?,
+      companions = ?,
+      active_focus = ?,
+      focus_turns_left = ?,
+      focus_effects = ?,
+      completed_focuses = ?,
+      caravan_cooldown = ?,
       last_active = ?
     WHERE user_id = ?
   `).run(
@@ -119,6 +185,17 @@ function savePlayer(player) {
     JSON.stringify(player.generals),
     JSON.stringify(player.agents),
     JSON.stringify(player.regions || {}),
+    player.politicalPower ?? 40,
+    player.stability ?? 60,
+    player.warSupport ?? 50,
+    player.organization ?? 100,
+    JSON.stringify(player.skills || defaultSkills()),
+    JSON.stringify(player.companions || []),
+    player.activeFocus || null,
+    player.focusTurnsLeft || 0,
+    JSON.stringify(player.focusEffects || {}),
+    JSON.stringify(player.completedFocuses || []),
+    player.caravanCooldown || 0,
     Date.now(),
     player.userId
   );
@@ -133,5 +210,6 @@ module.exports = {
   createPlayer,
   savePlayer,
   deletePlayer,
-  db
+  db,
+  defaultSkills
 };
