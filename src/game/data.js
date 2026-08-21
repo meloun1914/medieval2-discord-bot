@@ -1,8 +1,9 @@
 /**
- * Iron Crown — hybrid of Medieval strategy, HOI4 and Mount & Blade
+ * Scripta Belli — hybrid of Medieval strategy, HOI4 and Mount & Blade
+ * («Писания войны»)
  */
 
-const GAME_NAME = 'Iron Crown';
+const GAME_NAME = 'Scripta Belli';
 
 const FACTIONS = {
   england: {
