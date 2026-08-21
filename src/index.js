@@ -28,7 +28,7 @@ const {
   calculateUpkeep
 } = require('./game/engine');
 const { deletePlayer } = require('./game/database');
-const { generateMapImage, REGIONS } = require('./game/map');
+const { generateMapImage, REGIONS, startingRegions } = require('./game/map');
 
 const client = new Client({
   intents: [
@@ -61,12 +61,11 @@ client.on('interactionCreate', async interaction => {
       const me = interaction.guild.members.me;
       if (!me?.permissions.has(PermissionFlagsBits.ManageWebhooks)) {
         return interaction.reply({
-          content: 'Мне нужно право **Manage Webhooks**, чтобы работать `/echo`.',
+          content: 'Мне нужно право **Manage Webhooks**, чтобы работать /echo.',
           ephemeral: true
         });
       }
 
-      // Optional: block echoing bots / self abuse — allow everything for fun
       let displayName = target.username;
       let avatarURL = target.displayAvatarURL({ extension: 'png', size: 128 });
 
@@ -113,7 +112,7 @@ client.on('interactionCreate', async interaction => {
       const existing = getPlayer(userId);
       if (existing) {
         return interaction.reply({
-          content: 'У тебя уже есть кампания! Используй `/status` или `/reset` чтобы начать заново.',
+          content: 'У тебя уже есть кампания! Используй /status или /reset чтобы начать заново.',
           ephemeral: true
         });
       }
@@ -129,16 +128,23 @@ client.on('interactionCreate', async interaction => {
         .setTitle(`${faction.emoji} Кампания начата: ${faction.name}`)
         .setColor(faction.color)
         .setDescription(
-          `Добро пожаловать, правитель!\n\n` +
-          `**Религия:** ${faction.religion}\n` +
-          `**Стартовые флорины:** ${faction.startingFlorins}\n` +
-          `**Сильные стороны:** ${faction.strengths}\n` +
-          `**Стартовый регион:** ${regionNames || '—'}\n\n` +
-          `Побеждай в боях, чтобы захватывать соседние регионы.\n` +
-          `Карта мира: `/map``
+          [
+            'Добро пожаловать, правитель!',
+            '',
+            `**Религия:** ${faction.religion}`,
+            `**Стартовые флорины:** ${faction.startingFlorins}`,
+            `**Сильные стороны:** ${faction.strengths}`,
+            `**Стартовый регион:** ${regionNames || '—'}`,
+            '',
+            'Побеждай в боях, чтобы захватывать соседние регионы.',
+            'Карта мира: `/map`'
+          ].join('\n')
         )
         .addFields(
-          { name: 'Основные команды', value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`' }
+          {
+            name: 'Основные команды',
+            value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`'
+          }
         )
         .setFooter({ text: 'Medieval II Discord Bot • Ход 1' });
 
@@ -151,31 +157,35 @@ client.on('interactionCreate', async interaction => {
         .setTitle('📜 Medieval II Bot — Справка')
         .setColor(0x8B4513)
         .setDescription(
-          'Бот симулирует упрощённые механики **Medieval II: Total War**.\n\n' +
-          '### Кампания\n' +
-          '`/start` — начать (выбор фракции)\n' +
-          '`/status` — обзор империи\n' +
-          '`/map` — карта мира (Pillow)\n' +
-          '`/army` — состав армии\n' +
-          '`/recruit` — нанять юнитов\n' +
-          '`/build` — построить здание\n' +
-          '`/battle` — бой + шанс захватить регион\n' +
-          '`/endturn` — завершить ход\n' +
-          '`/reset` — сбросить кампанию\n\n' +
-          '### Фан\n' +
-          '`/echo @user текст` — сообщение от лица участника (временный webhook)\n\n' +
-          '### Механики\n' +
-          '• Флорины, здания, upkeep\n' +
-          '• Регионы на карте (доход + визуализация)\n' +
-          '• Поселение: Village → City\n' +
-          '• Битвы с потерями и экспансией'
+          [
+            'Бот симулирует упрощённые механики **Medieval II: Total War**.',
+            '',
+            '### Кампания',
+            '`/start` — начать (выбор фракции)',
+            '`/status` — обзор империи',
+            '`/map` — карта мира (Pillow)',
+            '`/army` — состав армии',
+            '`/recruit` — нанять юнитов',
+            '`/build` — построить здание',
+            '`/battle` — бой + шанс захватить регион',
+            '`/endturn` — завершить ход',
+            '`/reset` — сбросить кампанию',
+            '',
+            '### Фан',
+            '`/echo @user текст` — сообщение от лица участника (временный webhook)',
+            '',
+            '### Механики',
+            '• Флорины, здания, upkeep',
+            '• Регионы на карте (доход + визуализация)',
+            '• Поселение: Village → City',
+            '• Битвы с потерями и экспансией'
+          ].join('\n')
         )
         .setFooter({ text: 'Удачи, король!' });
 
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // Commands that need a player (except echo/help already handled)
     const needsPlayer = !['help', 'echo'].includes(command);
     let player = getPlayer(userId);
     if (needsPlayer && !player) {
@@ -224,9 +234,7 @@ client.on('interactionCreate', async interaction => {
       await interaction.deferReply();
 
       try {
-        // Ensure regions exist for old saves
         if (!player.regions || Object.keys(player.regions).length === 0) {
-          const { startingRegions } = require('./game/map');
           player.regions = startingRegions(player.faction);
           savePlayer(player);
         }
@@ -248,7 +256,6 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.editReply({ embeds: [embed], files: [file] });
 
-        // Cleanup temp file after a bit
         setTimeout(() => fs.unlink(imgPath, () => {}), 60_000);
       } catch (err) {
         console.error('map error', err);
@@ -256,7 +263,9 @@ client.on('interactionCreate', async interaction => {
           content:
             'Не удалось сгенерировать карту. Убедись, что установлен **Python 3** и **Pillow**:\n' +
             '```\npip install pillow\n```\n' +
-            `Ошибка: \`${String(err.message).slice(0, 200)}\``
+            'Ошибка: `' +
+            String(err.message).slice(0, 200) +
+            '`'
         });
       }
       return;
@@ -316,7 +325,7 @@ client.on('interactionCreate', async interaction => {
       let extra = '';
       if (result.victory && result.conquered) {
         const name = REGIONS[result.conquered]?.name || result.conquered;
-        extra = `\n\n🗺️ Захвачен регион: **${name}**! Смотри `/map``;
+        extra = `\n\n🗺️ Захвачен регион: **${name}**! Смотри \`/map\``;
       } else if (result.victory) {
         extra = '\n\n(Соседних свободных регионов нет — карта уже твоя или упёрся в край)';
       }
