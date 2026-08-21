@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const { FACTIONS } = require('./data');
+const { startingRegions } = require('./map');
 
 const dataDir = path.join(__dirname, '../../data');
 if (!fs.existsSync(dataDir)) {
@@ -23,10 +24,18 @@ db.exec(`
     army TEXT DEFAULT '[]',
     generals TEXT DEFAULT '[]',
     agents TEXT DEFAULT '[]',
+    regions TEXT DEFAULT '{}',
     last_active INTEGER,
     created_at INTEGER
   );
 `);
+
+// Migration: add regions column if missing (old DBs)
+try {
+  db.exec(`ALTER TABLE players ADD COLUMN regions TEXT DEFAULT '{}'`);
+} catch (_) {
+  // column already exists
+}
 
 function getPlayer(userId) {
   const row = db.prepare('SELECT * FROM players WHERE user_id = ?').get(userId);
@@ -43,6 +52,7 @@ function getPlayer(userId) {
     army: JSON.parse(row.army || '[]'),
     generals: JSON.parse(row.generals || '[]'),
     agents: JSON.parse(row.agents || '[]'),
+    regions: JSON.parse(row.regions || '{}'),
     lastActive: row.last_active,
     createdAt: row.created_at
   };
@@ -66,15 +76,18 @@ function createPlayer(userId, factionKey) {
     loyalty: 5
   }];
 
+  const regions = startingRegions(factionKey);
+
   db.prepare(`
-    INSERT INTO players (user_id, faction, florins, turn, population, settlement_level, buildings, army, generals, agents, last_active, created_at)
-    VALUES (?, ?, ?, 1, 500, 'village', '[]', ?, ?, '[]', ?, ?)
+    INSERT INTO players (user_id, faction, florins, turn, population, settlement_level, buildings, army, generals, agents, regions, last_active, created_at)
+    VALUES (?, ?, ?, 1, 500, 'village', '[]', ?, ?, '[]', ?, ?, ?)
   `).run(
     userId,
     factionKey,
     faction.startingFlorins,
     JSON.stringify(starterArmy),
     JSON.stringify(starterGeneral),
+    JSON.stringify(regions),
     now,
     now
   );
@@ -93,6 +106,7 @@ function savePlayer(player) {
       army = ?,
       generals = ?,
       agents = ?,
+      regions = ?,
       last_active = ?
     WHERE user_id = ?
   `).run(
@@ -104,6 +118,7 @@ function savePlayer(player) {
     JSON.stringify(player.army),
     JSON.stringify(player.generals),
     JSON.stringify(player.agents),
+    JSON.stringify(player.regions || {}),
     Date.now(),
     player.userId
   );
