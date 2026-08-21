@@ -1,8 +1,14 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const { FACTIONS, UNIT_TYPES } = require('./data');
+const fs = require('fs');
+const { FACTIONS } = require('./data');
 
-const db = new Database(path.join(__dirname, '../../data/medieval2.db'));
+const dataDir = path.join(__dirname, '../../data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const db = new Database(path.join(dataDir, 'medieval2.db'));
 
 // Initialize tables
 db.exec(`
