@@ -49,7 +49,7 @@ client.on('interactionCreate', async interaction => {
   const command = interaction.commandName;
 
   try {
-    // ========== /echo (does not need campaign) ==========
+    // ========== /echo ==========
     if (command === 'echo') {
       const target = interaction.options.getUser('user', true);
       const text = interaction.options.getString('message', true);
@@ -140,12 +140,10 @@ client.on('interactionCreate', async interaction => {
             'Карта мира: `/map`'
           ].join('\n')
         )
-        .addFields(
-          {
-            name: 'Основные команды',
-            value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`'
-          }
-        )
+        .addFields({
+          name: 'Основные команды',
+          value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`'
+        })
         .setFooter({ text: 'Medieval II Discord Bot • Ход 1' });
 
       return interaction.reply({ embeds: [embed] });
@@ -250,7 +248,7 @@ client.on('interactionCreate', async interaction => {
         const embed = new EmbedBuilder()
           .setTitle(`🗺️ Карта мира — ${FACTIONS[player.faction]?.name}`)
           .setColor(FACTIONS[player.faction]?.color || 0x8B4513)
-          .setDescription(`**Контроль:** ${regionList || '—'}\n**Ход:** ${player.turn}`)
+          .setDescription('**Контроль:** ' + (regionList || '—') + '\n**Ход:** ' + player.turn)
           .setImage('attachment://world_map.png')
           .setFooter({ text: 'Сгенерировано через Pillow' });
 
@@ -261,9 +259,7 @@ client.on('interactionCreate', async interaction => {
         console.error('map error', err);
         await interaction.editReply({
           content:
-            'Не удалось сгенерировать карту. Убедись, что установлен **Python 3** и **Pillow**:\n' +
-            '```\npip install pillow\n```\n' +
-            'Ошибка: `' +
+            'Не удалось сгенерировать карту. Убедись, что установлен **Python 3** и **Pillow**:\n```\npip install pillow\n```\nОшибка: `' +
             String(err.message).slice(0, 200) +
             '`'
         });
@@ -325,7 +321,7 @@ client.on('interactionCreate', async interaction => {
       let extra = '';
       if (result.victory && result.conquered) {
         const name = REGIONS[result.conquered]?.name || result.conquered;
-        extra = `\n\n🗺️ Захвачен регион: **${name}**! Смотри \`/map\``;
+        extra = '\n\n🗺️ Захвачен регион: **' + name + '**! Смотри `/map`';
       } else if (result.victory) {
         extra = '\n\n(Соседних свободных регионов нет — карта уже твоя или упёрся в край)';
       }
@@ -340,7 +336,9 @@ client.on('interactionCreate', async interaction => {
         )
         .setDescription(
           result.details.join('\n') +
-          (result.victory ? `\n\n💰 Трофеи: **+${result.loot}** флоринов` : '\n\nАрмия понесла тяжёлые потери.') +
+          (result.victory
+            ? '\n\n💰 Трофеи: **+' + result.loot + '** флоринов'
+            : '\n\nАрмия понесла тяжёлые потери.') +
           extra
         );
 
@@ -361,7 +359,11 @@ client.on('interactionCreate', async interaction => {
           { name: 'Рост населения', value: `+${growth}`, inline: true },
           { name: 'Текущие флорины', value: `${player.florins}`, inline: true },
           { name: 'Население', value: `${player.population}`, inline: true },
-          { name: 'Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true },
+          {
+            name: 'Поселение',
+            value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel,
+            inline: true
+          },
           {
             name: 'Регионы',
             value: String(Object.values(player.regions || {}).filter(Boolean).length),
@@ -400,7 +402,10 @@ client.on('interactionCreate', async interaction => {
       collector.on('collect', async i => {
         if (i.customId === 'confirm_reset') {
           deletePlayer(userId);
-          await i.update({ content: 'Кампания сброшена. Можешь начать заново через `/start`.', components: [] });
+          await i.update({
+            content: 'Кампания сброшена. Можешь начать заново через `/start`.',
+            components: []
+          });
         } else {
           await i.update({ content: 'Сброс отменён.', components: [] });
         }
@@ -412,7 +417,6 @@ client.on('interactionCreate', async interaction => {
         }
       });
     }
-
   } catch (err) {
     console.error(err);
     const msg = 'Произошла ошибка. Попробуй ещё раз.';
