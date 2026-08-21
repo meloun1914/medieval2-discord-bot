@@ -1,51 +1,23 @@
 require('dotenv').config();
 const fs = require('fs');
 const {
-  Client,
-  GatewayIntentBits,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  AttachmentBuilder,
-  PermissionFlagsBits
+  Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder,
+  ButtonBuilder, ButtonStyle, AttachmentBuilder, PermissionFlagsBits
 } = require('discord.js');
 const {
-  GAME_NAME,
-  FACTIONS,
-  UNIT_TYPES,
-  BUILDINGS,
-  SETTLEMENT_LEVELS,
-  FOCUSES,
-  COMPANIONS,
-  SKILLS
+  GAME_NAME, FACTIONS, UNIT_TYPES, BUILDINGS, SETTLEMENT_LEVELS,
+  FOCUSES, COMPANIONS, SKILLS
 } = require('./game/data');
 const {
-  getPlayer,
-  createPlayer,
-  savePlayer,
-  endTurn,
-  recruitUnit,
-  buildBuilding,
-  resolveBattle,
-  calculateIncome,
-  calculateUpkeep,
-  startFocus,
-  hireCompanion,
-  runCaravan
+  getPlayer, createPlayer, savePlayer, endTurn, recruitUnit, buildBuilding,
+  resolveBattle, calculateIncome, calculateUpkeep, startFocus, hireCompanion, runCaravan
 } = require('./game/engine');
 const { deletePlayer } = require('./game/database');
 const { generateMapImage, REGIONS, startingRegions } = require('./game/map');
 
 const COLORS = {
-  gold: 0xC9A227,
-  success: 0x2ECC71,
-  danger: 0xE74C3C,
-  warn: 0xF39C12,
-  info: 0x3498DB,
-  parchment: 0xD4A574,
-  iron: 0x5D6D7E,
-  focus: 0x8E44AD
+  gold: 0xC9A227, success: 0x2ECC71, danger: 0xE74C3C, warn: 0xF39C12,
+  info: 0x3498DB, parchment: 0xD4A574, iron: 0x5D6D7E, focus: 0x8E44AD
 };
 
 function baseEmbed(title, color = COLORS.gold) {
@@ -95,11 +67,7 @@ client.on('interactionCreate', async interaction => {
       }
       const me = interaction.guild.members.me;
       if (!me?.permissions.has(PermissionFlagsBits.ManageWebhooks)) {
-        return replyEmbed(
-          interaction,
-          errorEmbed('Нужно право **Manage Webhooks**.'),
-          { ephemeral: true }
-        );
+        return replyEmbed(interaction, errorEmbed('Нужно право **Manage Webhooks**.'), { ephemeral: true });
       }
       let displayName = target.username;
       let avatarURL = target.displayAvatarURL({ extension: 'png', size: 128 });
@@ -119,13 +87,10 @@ client.on('interactionCreate', async interaction => {
           reason: `echo by ${interaction.user.tag}`
         });
         await webhook.send({ content: text, username: displayName.slice(0, 80), avatarURL });
-        await replyEmbed(
-          interaction,
-          successEmbed('🎭 Echo', `Отправлено от лица **${displayName}**.`)
-        );
+        await replyEmbed(interaction, successEmbed('🎭 Сообщение отправлено', `От лица **${displayName}**.`));
       } catch (err) {
         console.error(err);
-        await replyEmbed(interaction, errorEmbed('Webhook не удался.'));
+        await replyEmbed(interaction, errorEmbed('Не удалось отправить через вебхук.'));
       } finally {
         if (webhook) await webhook.delete('echo cleanup').catch(() => {});
       }
@@ -134,23 +99,17 @@ client.on('interactionCreate', async interaction => {
 
     if (command === 'start') {
       if (getPlayer(userId)) {
-        return replyEmbed(
-          interaction,
-          errorEmbed('Кампания уже есть. `/status` или `/reset`.'),
-          { ephemeral: true }
-        );
+        return replyEmbed(interaction, errorEmbed('Кампания уже есть. `/status` или `/reset`.'), { ephemeral: true });
       }
       const factionKey = interaction.options.getString('faction');
       const player = createPlayer(userId, factionKey);
       const faction = FACTIONS[factionKey];
-      const regionNames = Object.keys(player.regions || {})
-        .map(id => REGIONS[id]?.name || id)
-        .join(', ');
+      const regionNames = Object.keys(player.regions || {}).map(id => REGIONS[id]?.name || id).join(', ');
 
       const embed = baseEmbed(`${faction.emoji} ${GAME_NAME}`, faction.color)
         .setDescription(
           `Ты — правитель **${faction.name}**.\n` +
-            '**Scripta Belli** — писания войны: стратегия, фокусы державы и путь лорда.'
+          '**Scripta Belli** — писания войны: стратегия, фокусы державы и путь лорда.'
         )
         .addFields(
           { name: '⛪ Религия', value: faction.religion, inline: true },
@@ -161,7 +120,7 @@ client.on('interactionCreate', async interaction => {
             name: '🎮 С чего начать',
             value: [
               '`/status` — империя',
-              '`/ruler` — навыки и PP',
+              '`/ruler` — навыки и власть',
               '`/focus` — национальный фокус',
               '`/companion` — компаньон',
               '`/caravan` — торговля',
@@ -170,7 +129,6 @@ client.on('interactionCreate', async interaction => {
           }
         )
         .setFooter({ text: `${GAME_NAME} • Ход 1` });
-
       return replyEmbed(interaction, embed);
     }
 
@@ -178,27 +136,15 @@ client.on('interactionCreate', async interaction => {
       const embed = baseEmbed(`📜 ${GAME_NAME} — Справка`, COLORS.parchment)
         .setDescription(
           '**Scripta Belli** («Писания войны»):\n' +
-            '• стратегия и карта\n' +
-            '• Political Power, фокусы, org, stability\n' +
-            '• навыки правителя, компаньоны, караваны, промоут войск'
+          '• стратегия и карта\n' +
+          '• политическая власть, фокусы, организация, стабильность\n' +
+          '• навыки правителя, компаньоны, караваны, повышение войск'
         )
         .addFields(
-          {
-            name: '🏰 Империя',
-            value: '`/start` `/status` `/map` `/build` `/endturn` `/reset`'
-          },
-          {
-            name: '⚔️ Война',
-            value: '`/army` `/recruit` `/battle` — org, ветераны, регионы'
-          },
-          {
-            name: '🧠 Держава',
-            value: '`/focus` — Industrial, Military Reform, Propaganda…\n`/ruler` — PP, Stability, War Support, Organization'
-          },
-          {
-            name: '🗡️ Путь лорда',
-            value: '`/companion` — нанять героя\n`/caravan` — риск/прибыль\nНавыки качаются от действий\nВетераны промоутятся после боёв'
-          },
+          { name: '🏰 Империя', value: '`/start` `/status` `/map` `/build` `/endturn` `/reset`' },
+          { name: '⚔️ Война', value: '`/army` `/recruit` `/battle` — организация, ветераны, регионы' },
+          { name: '🧠 Держава', value: '`/focus` — фокусы\n`/ruler` — власть, стабильность, поддержка войны, организация' },
+          { name: '🗡️ Путь лорда', value: '`/companion` — герой\n`/caravan` — риск и прибыль\nНавыки растут от действий\nВетераны повышаются после боёв' },
           { name: '🎭 Фан', value: '`/echo @user текст`' }
         )
         .setFooter({ text: GAME_NAME });
@@ -218,38 +164,30 @@ client.on('interactionCreate', async interaction => {
       const buildingsList = player.buildings.length
         ? player.buildings.map(b => `• ${BUILDINGS[b]?.name || b}`).join('\n')
         : '_нет_';
-      const regionList = Object.keys(player.regions || {})
-        .filter(id => player.regions[id])
-        .map(id => REGIONS[id]?.name || id);
+      const regionList = Object.keys(player.regions || {}).filter(id => player.regions[id]).map(id => REGIONS[id]?.name || id);
       const armySize = player.army.reduce((s, u) => s + (u.count || 1), 0);
       const focusName = player.activeFocus
-        ? `${FOCUSES[player.activeFocus]?.emoji || ''} ${FOCUSES[player.activeFocus]?.name} (${player.focusTurnsLeft}х)`
+        ? `${FOCUSES[player.activeFocus]?.emoji || ''} ${FOCUSES[player.activeFocus]?.name} (${player.focusTurnsLeft} х.)`
         : '_нет_';
-      const comps = (player.companions || [])
-        .map(id => COMPANIONS[id]?.emoji + ' ' + (COMPANIONS[id]?.name || id))
-        .join('\n') || '_нет_';
+      const comps = (player.companions || []).map(id => COMPANIONS[id]?.emoji + ' ' + (COMPANIONS[id]?.name || id)).join('\n') || '_нет_';
 
       const embed = factionEmbed(player)
         .setDescription(`Ход **${player.turn}** · ${GAME_NAME}`)
         .addFields(
           { name: '💰 Флорины', value: `**${player.florins}**`, inline: true },
           { name: '📈 Доход', value: `+${income}`, inline: true },
-          { name: '📉 Upkeep', value: `−${upkeep}`, inline: true },
+          { name: '📉 Содержание', value: `−${upkeep}`, inline: true },
           { name: '⚖️ Чистыми', value: net >= 0 ? `**+${net}**` : `**${net}**`, inline: true },
-          { name: '🧠 PP', value: `**${player.politicalPower ?? 0}**`, inline: true },
-          { name: '📊 Stability', value: `${player.stability ?? 60}`, inline: true },
-          { name: '📣 War Support', value: `${player.warSupport ?? 50}`, inline: true },
-          { name: '⚙️ Organization', value: `${player.organization ?? 100}%`, inline: true },
-          {
-            name: '🏰 Поселение',
-            value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel,
-            inline: true
-          },
+          { name: '🧠 Полит. власть', value: `**${player.politicalPower ?? 0}**`, inline: true },
+          { name: '📊 Стабильность', value: `${player.stability ?? 60}`, inline: true },
+          { name: '📣 Поддержка войны', value: `${player.warSupport ?? 50}`, inline: true },
+          { name: '⚙️ Организация', value: `${player.organization ?? 100}%`, inline: true },
+          { name: '🏰 Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true },
           { name: '🎯 Фокус', value: focusName },
           { name: `🗺️ Регионы (${regionList.length})`, value: regionList.join(', ') || '_нет_' },
           { name: '🗡️ Компаньоны', value: comps, inline: true },
           { name: '🏗️ Здания', value: buildingsList, inline: true },
-          { name: '⚔️ Армия', value: `**${armySize}** юнитов`, inline: true }
+          { name: '⚔️ Армия', value: `**${armySize}** отрядов`, inline: true }
         );
       return replyEmbed(interaction, embed);
     }
@@ -264,10 +202,10 @@ client.on('interactionCreate', async interaction => {
       const embed = factionEmbed(player, '👑 Правитель')
         .setDescription(lines.join('\n\n'))
         .addFields(
-          { name: '🧠 Political Power', value: `**${player.politicalPower ?? 0}**`, inline: true },
-          { name: '📊 Stability', value: `${player.stability ?? 60}`, inline: true },
-          { name: '📣 War Support', value: `${player.warSupport ?? 50}`, inline: true },
-          { name: '⚙️ Organization', value: `${player.organization ?? 100}%`, inline: true }
+          { name: '🧠 Полит. власть', value: `**${player.politicalPower ?? 0}**`, inline: true },
+          { name: '📊 Стабильность', value: `${player.stability ?? 60}`, inline: true },
+          { name: '📣 Поддержка войны', value: `${player.warSupport ?? 50}`, inline: true },
+          { name: '⚙️ Организация', value: `${player.organization ?? 100}%`, inline: true }
         );
       return replyEmbed(interaction, embed);
     }
@@ -275,17 +213,15 @@ client.on('interactionCreate', async interaction => {
     if (command === 'focus') {
       const key = interaction.options.getString('name');
       const result = startFocus(player, key);
-      if (!result.success) {
-        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
-      }
+      if (!result.success) return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       player = getPlayer(userId);
       const f = result.focus;
       const embed = baseEmbed(`${f.emoji} ${f.name}`, COLORS.focus)
         .setDescription(f.description)
         .addFields(
-          { name: 'Стоимость', value: `${f.costPP} PP`, inline: true },
+          { name: 'Стоимость', value: `${f.costPP} власти`, inline: true },
           { name: 'Длительность', value: f.duration ? `${f.duration} хода` : 'Мгновенно', inline: true },
-          { name: 'Остаток PP', value: `${player.politicalPower}`, inline: true }
+          { name: 'Остаток власти', value: `${player.politicalPower}`, inline: true }
         )
         .setFooter({ text: GAME_NAME });
       return replyEmbed(interaction, embed);
@@ -294,15 +230,13 @@ client.on('interactionCreate', async interaction => {
     if (command === 'companion') {
       const id = interaction.options.getString('name');
       const result = hireCompanion(player, id);
-      if (!result.success) {
-        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
-      }
+      if (!result.success) return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       player = getPlayer(userId);
       const c = result.companion;
       const embed = successEmbed(`${c.emoji} ${c.name}`, c.description)
         .addFields(
           { name: 'Цена', value: `${c.cost}`, inline: true },
-          { name: 'Upkeep', value: `${c.upkeep}/ход`, inline: true },
+          { name: 'Содержание', value: `${c.upkeep}/ход`, inline: true },
           { name: 'В отряде', value: `${(player.companions || []).length}/3`, inline: true }
         )
         .setColor(FACTIONS[player.faction]?.color || COLORS.success);
@@ -311,9 +245,7 @@ client.on('interactionCreate', async interaction => {
 
     if (command === 'caravan') {
       const result = runCaravan(player);
-      if (!result.success) {
-        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
-      }
+      if (!result.success) return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       player = getPlayer(userId);
       const embed = baseEmbed(
         result.survived ? '🐪 Караван вернулся' : '💀 Караван ограблен',
@@ -322,11 +254,7 @@ client.on('interactionCreate', async interaction => {
         .setDescription(result.message)
         .addFields(
           { name: 'Вложено', value: `${result.invest}`, inline: true },
-          {
-            name: result.survived ? 'Прибыль' : 'Убыток',
-            value: result.survived ? `+${result.profit}` : `${result.profit}`,
-            inline: true
-          },
+          { name: result.survived ? 'Прибыль' : 'Убыток', value: result.survived ? `+${result.profit}` : `${result.profit}`, inline: true },
           { name: 'Казна', value: `${player.florins}`, inline: true }
         )
         .setFooter({ text: `Кулдаун 2 хода • ${GAME_NAME}` });
@@ -342,14 +270,10 @@ client.on('interactionCreate', async interaction => {
         }
         const imgPath = await generateMapImage(player);
         const file = new AttachmentBuilder(imgPath, { name: 'world_map.png' });
-        const regionList = Object.keys(player.regions)
-          .filter(id => player.regions[id])
-          .map(id => REGIONS[id]?.name || id);
+        const regionList = Object.keys(player.regions).filter(id => player.regions[id]).map(id => REGIONS[id]?.name || id);
         const faction = FACTIONS[player.faction];
         const embed = factionEmbed(player, `🗺️ Карта — ${faction.name}`)
-          .setDescription(
-            regionList.length ? `**${regionList.join(' • ')}**` : 'Нет регионов.'
-          )
+          .setDescription(regionList.length ? `**${regionList.join(' • ')}**` : 'Нет регионов.')
           .addFields(
             { name: 'Регионов', value: `${regionList.length}`, inline: true },
             { name: 'Ход', value: `${player.turn}`, inline: true },
@@ -360,21 +284,14 @@ client.on('interactionCreate', async interaction => {
         setTimeout(() => fs.unlink(imgPath, () => {}), 60000);
       } catch (err) {
         console.error(err);
-        await replyEmbed(
-          interaction,
-          errorEmbed('Карта не собралась. Нужны Python3 + Pillow (`pip install pillow`).')
-        );
+        await replyEmbed(interaction, errorEmbed('Карта не собралась. Нужны Python3 и Pillow (`pip install pillow`).'));
       }
       return;
     }
 
     if (command === 'army') {
       if (!player.army.length) {
-        return replyEmbed(
-          interaction,
-          infoEmbed('⚔️ Армия пуста', 'Нанимай через `/recruit`.'),
-          { ephemeral: true }
-        );
+        return replyEmbed(interaction, infoEmbed('⚔️ Армия пуста', 'Нанимай через `/recruit`.'), { ephemeral: true });
       }
       const total = player.army.reduce((s, u) => s + (u.count || 1), 0);
       const lead = player.skills?.leadership || 1;
@@ -385,20 +302,16 @@ client.on('interactionCreate', async interaction => {
         const icon = def?.type === 'cavalry' ? '🐴' : def?.type === 'missile' ? '🏹' : '🛡️';
         return (
           `**${i + 1}.** ${icon} **${def?.name || u.unit}** ×${u.count || 1}${exp}\n` +
-          '  ATK `' +
-          (def?.attack ?? '?') +
-          '` DEF `' +
-          (def?.defense ?? '?') +
-          '`' +
-          (def?.promotesTo && (u.experience || 0) >= 4 ? ' · _готов к промоуту_' : '')
+          '  АТК `' + (def?.attack ?? '?') + '` ЗАЩ `' + (def?.defense ?? '?') + '`' +
+          (def?.promotesTo && (u.experience || 0) >= 4 ? ' · _готов к повышению_' : '')
         );
       });
       const embed = factionEmbed(player, '⚔️ Армия')
         .setDescription(lines.join('\n\n'))
         .addFields(
           { name: 'Численность', value: `**${total}** / ${maxArmy}`, inline: true },
-          { name: 'Upkeep', value: `**${calculateUpkeep(player)}**/ход`, inline: true },
-          { name: '⚙️ Org', value: `**${player.organization ?? 100}%**`, inline: true }
+          { name: 'Содержание', value: `**${calculateUpkeep(player)}**/ход`, inline: true },
+          { name: '⚙️ Организация', value: `**${player.organization ?? 100}%**`, inline: true }
         );
       return replyEmbed(interaction, embed);
     }
@@ -408,17 +321,13 @@ client.on('interactionCreate', async interaction => {
       const amount = interaction.options.getInteger('amount') || 1;
       const unitDef = UNIT_TYPES[unitKey];
       const result = recruitUnit(player, unitKey, amount);
-      if (!result.success) {
-        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
-      }
+      if (!result.success) return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       player = getPlayer(userId);
-      const embed = successEmbed(
-        '🎖️ Найм',
-        `**${amount}× ${unitDef?.name || unitKey}** в строю.`
-      ).addFields(
-        { name: 'Потрачено', value: `${(unitDef?.cost || 0) * amount}`, inline: true },
-        { name: 'Казна', value: `${player.florins}`, inline: true }
-      );
+      const embed = successEmbed('🎖️ Найм', `**${amount}× ${unitDef?.name || unitKey}** в строю.`)
+        .addFields(
+          { name: 'Потрачено', value: `${(unitDef?.cost || 0) * amount}`, inline: true },
+          { name: 'Казна', value: `${player.florins}`, inline: true }
+        );
       return replyEmbed(interaction, embed);
     }
 
@@ -426,14 +335,13 @@ client.on('interactionCreate', async interaction => {
       const buildingKey = interaction.options.getString('building');
       const building = BUILDINGS[buildingKey];
       const result = buildBuilding(player, buildingKey);
-      if (!result.success) {
-        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
-      }
+      if (!result.success) return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       player = getPlayer(userId);
-      const embed = successEmbed('🏗️ Построено', `**${building?.name || buildingKey}**`).addFields(
-        { name: 'Цена', value: `${building?.cost ?? '?'}`, inline: true },
-        { name: 'Казна', value: `${player.florins}`, inline: true }
-      );
+      const embed = successEmbed('🏗️ Построено', `**${building?.name || buildingKey}**`)
+        .addFields(
+          { name: 'Цена', value: `${building?.cost ?? '?'}`, inline: true },
+          { name: 'Казна', value: `${player.florins}`, inline: true }
+        );
       return replyEmbed(interaction, embed);
     }
 
@@ -448,59 +356,26 @@ client.on('interactionCreate', async interaction => {
         result.victory ? '🏆 Победа!' : '💀 Поражение',
         result.victory ? COLORS.success : COLORS.danger
       )
-        .setDescription(
-          result.victory
-            ? 'Враг разбит. Ветераны закаляются.'
-            : 'Отступление. Org и morale просели.'
-        )
+        .setDescription(result.victory ? 'Враг разбит. Ветераны закаляются.' : 'Отступление. Организация и мораль просели.')
         .addFields(
-          {
-            name: '⚔️ Сила',
-            value: `**${result.playerPower}** (бросок ${result.playerRoll})`,
-            inline: true
-          },
-          {
-            name: '☠️ Враг',
-            value: `**${result.enemyPower}** (бросок ${result.enemyRoll})`,
-            inline: true
-          },
-          {
-            name: '🩸 Потери',
-            value: `~${Math.round(result.casualtiesPercent * 100)}%`,
-            inline: true
-          },
-          {
-            name: '⚙️ Org',
-            value: `−${result.orgLoss} → **${player.organization}%**`,
-            inline: true
-          },
-          {
-            name: '📋 Состав',
-            value: result.details.slice(0, 6).join('\n') || '—'
-          }
+          { name: '⚔️ Сила', value: `**${result.playerPower}** (бросок ${result.playerRoll})`, inline: true },
+          { name: '☠️ Враг', value: `**${result.enemyPower}** (бросок ${result.enemyRoll})`, inline: true },
+          { name: '🩸 Потери', value: `~${Math.round(result.casualtiesPercent * 100)}%`, inline: true },
+          { name: '⚙️ Организация', value: `−${result.orgLoss} → **${player.organization}%**`, inline: true },
+          { name: '📋 Состав', value: result.details.slice(0, 6).join('\n') || '—' }
         );
 
       if (result.victory) {
         embed.addFields({ name: '💰 Трофеи', value: `+${result.loot}`, inline: true });
         if (result.conquered) {
           const name = REGIONS[result.conquered]?.name || result.conquered;
-          embed.addFields({
-            name: '🗺️ Регион',
-            value: `Захвачен **${name}**`,
-            inline: true
-          });
+          embed.addFields({ name: '🗺️ Регион', value: `Захвачен **${name}**`, inline: true });
         }
         if (result.promoted?.length) {
-          embed.addFields({
-            name: '⬆️ Промоут',
-            value: result.promoted.join('\n')
-          });
+          embed.addFields({ name: '⬆️ Повышение', value: result.promoted.join('\n') });
         }
       }
-
-      embed.setFooter({
-        text: `${FACTIONS[player.faction]?.name} • WS ${player.warSupport} • ${GAME_NAME}`
-      });
+      embed.setFooter({ text: `${FACTIONS[player.faction]?.name} • Поддержка войны ${player.warSupport} • ${GAME_NAME}` });
       return replyEmbed(interaction, embed);
     }
 
@@ -513,25 +388,20 @@ client.on('interactionCreate', async interaction => {
         .setDescription('Сезон пройден. Империя дышит.')
         .addFields(
           { name: '📈 Доход', value: `+${income}`, inline: true },
-          { name: '📉 Upkeep', value: `−${upkeep}`, inline: true },
+          { name: '📉 Содержание', value: `−${upkeep}`, inline: true },
           { name: '⚖️ Итого', value: net >= 0 ? `+${net}` : `${net}`, inline: true },
-          { name: '🧠 +PP', value: `+${ppGain} → **${player.politicalPower}**`, inline: true },
-          { name: '⚙️ Org', value: `${player.organization}%`, inline: true },
+          { name: '🧠 +Власть', value: `+${ppGain} → **${player.politicalPower}**`, inline: true },
+          { name: '⚙️ Организация', value: `${player.organization}%`, inline: true },
           { name: '👥 Население', value: `${player.population} (+${growth})`, inline: true },
           {
             name: '🎯 Фокус',
-            value: player.activeFocus
-              ? `${FOCUSES[player.activeFocus]?.name} (${player.focusTurnsLeft}х)`
-              : '—',
+            value: player.activeFocus ? `${FOCUSES[player.activeFocus]?.name} (${player.focusTurnsLeft} х.)` : '—',
             inline: true
           },
           { name: '➡️ Ход', value: `**${player.turn}**`, inline: true }
         );
       if (leveled?.length) {
-        embed.addFields({
-          name: '⬆️ Навык вырос',
-          value: leveled.map(s => SKILLS[s]?.name || s).join(', ')
-        });
+        embed.addFields({ name: '⬆️ Навык вырос', value: leveled.map(s => SKILLS[s]?.name || s).join(', ') });
       }
       return replyEmbed(interaction, embed);
     }
@@ -541,43 +411,22 @@ client.on('interactionCreate', async interaction => {
         .setDescription('Удалить кампанию целиком?')
         .setFooter({ text: '15 секунд' });
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('confirm_reset')
-          .setLabel('Сбросить')
-          .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-          .setCustomId('cancel_reset')
-          .setLabel('Отмена')
-          .setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId('confirm_reset').setLabel('Сбросить').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('cancel_reset').setLabel('Отмена').setStyle(ButtonStyle.Secondary)
       );
-      const reply = await interaction.reply({
-        embeds: [embed],
-        components: [row],
-        ephemeral: true
-      });
-      const collector = reply.createMessageComponentCollector({
-        time: 15000,
-        filter: i => i.user.id === userId
-      });
+      const reply = await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      const collector = reply.createMessageComponentCollector({ time: 15000, filter: i => i.user.id === userId });
       collector.on('collect', async i => {
         if (i.customId === 'confirm_reset') {
           deletePlayer(userId);
-          await i.update({
-            embeds: [successEmbed('🗑️ Сброшено', 'Начни заново: `/start`.')],
-            components: []
-          });
+          await i.update({ embeds: [successEmbed('🗑️ Сброшено', 'Начни заново: `/start`.')], components: [] });
         } else {
-          await i.update({
-            embeds: [infoEmbed('Отмена', 'Империя цела.')],
-            components: []
-          });
+          await i.update({ embeds: [infoEmbed('Отмена', 'Империя цела.')], components: [] });
         }
       });
       collector.on('end', async c => {
         if (!c.size) {
-          await interaction
-            .editReply({ embeds: [infoEmbed('⌛ Таймаут', 'Сброс не подтверждён.')], components: [] })
-            .catch(() => {});
+          await interaction.editReply({ embeds: [infoEmbed('⌛ Время вышло', 'Сброс не подтверждён.')], components: [] }).catch(() => {});
         }
       });
     }
