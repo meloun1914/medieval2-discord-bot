@@ -1,11 +1,14 @@
 require('dotenv').config();
+const fs = require('fs');
 const {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  AttachmentBuilder,
+  PermissionFlagsBits
 } = require('discord.js');
 const {
   FACTIONS,
@@ -20,20 +23,23 @@ const {
   endTurn,
   recruitUnit,
   buildBuilding,
-  simulateBattle,
-  applyCasualties,
+  resolveBattle,
   calculateIncome,
   calculateUpkeep
 } = require('./game/engine');
 const { deletePlayer } = require('./game/database');
+const { generateMapImage, REGIONS } = require('./game/map');
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers
+  ]
 });
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
-  client.user.setActivity('Medieval II: Total War', { type: 3 }); // Watching
+  client.user.setActivity('Medieval II: Total War', { type: 3 });
 });
 
 client.on('interactionCreate', async interaction => {
@@ -43,6 +49,65 @@ client.on('interactionCreate', async interaction => {
   const command = interaction.commandName;
 
   try {
+    // ========== /echo (does not need campaign) ==========
+    if (command === 'echo') {
+      const target = interaction.options.getUser('user', true);
+      const text = interaction.options.getString('message', true);
+
+      if (!interaction.guild) {
+        return interaction.reply({ content: 'Только на сервере.', ephemeral: true });
+      }
+
+      const me = interaction.guild.members.me;
+      if (!me?.permissions.has(PermissionFlagsBits.ManageWebhooks)) {
+        return interaction.reply({
+          content: 'Мне нужно право **Manage Webhooks**, чтобы работать `/echo`.',
+          ephemeral: true
+        });
+      }
+
+      // Optional: block echoing bots / self abuse — allow everything for fun
+      let displayName = target.username;
+      let avatarURL = target.displayAvatarURL({ extension: 'png', size: 128 });
+
+      try {
+        const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+        if (member) {
+          displayName = member.displayName || target.username;
+          avatarURL = member.displayAvatarURL({ extension: 'png', size: 128 });
+        }
+      } catch (_) {}
+
+      await interaction.deferReply({ ephemeral: true });
+
+      let webhook = null;
+      try {
+        webhook = await interaction.channel.createWebhook({
+          name: displayName.slice(0, 80),
+          avatar: avatarURL,
+          reason: `echo by ${interaction.user.tag}`
+        });
+
+        await webhook.send({
+          content: text,
+          username: displayName.slice(0, 80),
+          avatarURL
+        });
+
+        await interaction.editReply({ content: '✅ Сообщение отправлено.' });
+      } catch (err) {
+        console.error('echo error', err);
+        await interaction.editReply({
+          content: 'Не удалось создать/отправить через вебхук. Проверь права бота.'
+        });
+      } finally {
+        if (webhook) {
+          await webhook.delete('echo cleanup').catch(() => {});
+        }
+      }
+      return;
+    }
+
     // ========== /start ==========
     if (command === 'start') {
       const existing = getPlayer(userId);
@@ -56,6 +121,9 @@ client.on('interactionCreate', async interaction => {
       const factionKey = interaction.options.getString('faction');
       const player = createPlayer(userId, factionKey);
       const faction = FACTIONS[factionKey];
+      const regionNames = Object.keys(player.regions || {})
+        .map(id => REGIONS[id]?.name || id)
+        .join(', ');
 
       const embed = new EmbedBuilder()
         .setTitle(`${faction.emoji} Кампания начата: ${faction.name}`)
@@ -64,12 +132,13 @@ client.on('interactionCreate', async interaction => {
           `Добро пожаловать, правитель!\n\n` +
           `**Религия:** ${faction.religion}\n` +
           `**Стартовые флорины:** ${faction.startingFlorins}\n` +
-          `**Сильные стороны:** ${faction.strengths}\n\n` +
-          `Ты начинаешь с небольшой армией и деревней.\n` +
-          `Используй команды ниже, чтобы развивать империю.`
+          `**Сильные стороны:** ${faction.strengths}\n` +
+          `**Стартовый регион:** ${regionNames || '—'}\n\n` +
+          `Побеждай в боях, чтобы захватывать соседние регионы.\n` +
+          `Карта мира: `/map``
         )
         .addFields(
-          { name: 'Основные команды', value: '`/status` `/recruit` `/build` `/battle` `/endturn` `/army` `/help`' }
+          { name: 'Основные команды', value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`' }
         )
         .setFooter({ text: 'Medieval II Discord Bot • Ход 1' });
 
@@ -83,32 +152,33 @@ client.on('interactionCreate', async interaction => {
         .setColor(0x8B4513)
         .setDescription(
           'Бот симулирует упрощённые механики **Medieval II: Total War**.\n\n' +
-          '**Кампания пошаговая.** Каждый игрок ведёт свою империю.\n\n' +
-          '### Команды:\n' +
-          '`/start` — начать кампанию (выбор фракции)\n' +
+          '### Кампания\n' +
+          '`/start` — начать (выбор фракции)\n' +
           '`/status` — обзор империи\n' +
+          '`/map` — карта мира (Pillow)\n' +
           '`/army` — состав армии\n' +
           '`/recruit` — нанять юнитов\n' +
           '`/build` — построить здание\n' +
-          '`/battle` — сразиться с врагом\n' +
-          '`/endturn` — завершить ход (доход + рост)\n' +
+          '`/battle` — бой + шанс захватить регион\n' +
+          '`/endturn` — завершить ход\n' +
           '`/reset` — сбросить кампанию\n\n' +
-          '### Механики:\n' +
-          '• **Флорины** — главная валюта\n' +
-          '• **Здания** дают доход и открывают юнитов\n' +
-          '• **Армия** максимум ~20 юнитов\n' +
-          '• **Битвы** — простая симуляция силы + рандом\n' +
-          '• **Ход** — доход, upkeep, рост населения, апгрейд поселения\n' +
-          '• Поселение растёт: Village → Town → Large Town → City...'
+          '### Фан\n' +
+          '`/echo @user текст` — сообщение от лица участника (временный webhook)\n\n' +
+          '### Механики\n' +
+          '• Флорины, здания, upkeep\n' +
+          '• Регионы на карте (доход + визуализация)\n' +
+          '• Поселение: Village → City\n' +
+          '• Битвы с потерями и экспансией'
         )
         .setFooter({ text: 'Удачи, король!' });
 
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // All other commands require a player
+    // Commands that need a player (except echo/help already handled)
+    const needsPlayer = !['help', 'echo'].includes(command);
     let player = getPlayer(userId);
-    if (!player && command !== 'help') {
+    if (needsPlayer && !player) {
       return interaction.reply({
         content: 'Сначала начни кампанию командой `/start`!',
         ephemeral: true
@@ -126,6 +196,10 @@ client.on('interactionCreate', async interaction => {
         ? player.buildings.map(b => BUILDINGS[b]?.name || b).join(', ')
         : 'Нет';
 
+      const regionList = Object.keys(player.regions || {})
+        .filter(id => player.regions[id])
+        .map(id => REGIONS[id]?.name || id);
+
       const embed = new EmbedBuilder()
         .setTitle(`${faction.emoji} ${faction.name} — Ход ${player.turn}`)
         .setColor(faction.color)
@@ -136,12 +210,56 @@ client.on('interactionCreate', async interaction => {
           { name: '⚖️ Чистый доход', value: `${net >= 0 ? '+' : ''}${net}`, inline: true },
           { name: '👥 Население', value: `${player.population}`, inline: true },
           { name: '🏰 Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true },
+          { name: '🗺️ Регионы', value: regionList.length ? regionList.join(', ') : 'Нет' },
           { name: '🏗️ Здания', value: buildingsList },
           { name: '⚔️ Армия', value: `${player.army.reduce((s, u) => s + (u.count || 1), 0)} юнитов` }
         )
         .setFooter({ text: `Последняя активность: ${new Date(player.lastActive).toLocaleString('ru-RU')}` });
 
       return interaction.reply({ embeds: [embed] });
+    }
+
+    // ========== /map ==========
+    if (command === 'map') {
+      await interaction.deferReply();
+
+      try {
+        // Ensure regions exist for old saves
+        if (!player.regions || Object.keys(player.regions).length === 0) {
+          const { startingRegions } = require('./game/map');
+          player.regions = startingRegions(player.faction);
+          savePlayer(player);
+        }
+
+        const imgPath = await generateMapImage(player);
+        const file = new AttachmentBuilder(imgPath, { name: 'world_map.png' });
+
+        const regionList = Object.keys(player.regions)
+          .filter(id => player.regions[id])
+          .map(id => REGIONS[id]?.name || id)
+          .join(', ');
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🗺️ Карта мира — ${FACTIONS[player.faction]?.name}`)
+          .setColor(FACTIONS[player.faction]?.color || 0x8B4513)
+          .setDescription(`**Контроль:** ${regionList || '—'}\n**Ход:** ${player.turn}`)
+          .setImage('attachment://world_map.png')
+          .setFooter({ text: 'Сгенерировано через Pillow' });
+
+        await interaction.editReply({ embeds: [embed], files: [file] });
+
+        // Cleanup temp file after a bit
+        setTimeout(() => fs.unlink(imgPath, () => {}), 60_000);
+      } catch (err) {
+        console.error('map error', err);
+        await interaction.editReply({
+          content:
+            'Не удалось сгенерировать карту. Убедись, что установлен **Python 3** и **Pillow**:\n' +
+            '```\npip install pillow\n```\n' +
+            `Ошибка: \`${String(err.message).slice(0, 200)}\``
+        });
+      }
+      return;
     }
 
     // ========== /army ==========
@@ -193,17 +311,14 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: 'У тебя нет армии!', ephemeral: true });
       }
 
-      const result = simulateBattle(player.army);
+      const result = resolveBattle(player);
 
-      // Apply casualties
-      applyCasualties(player, result.casualtiesPercent);
-
-      // Loot on victory
-      let loot = 0;
-      if (result.victory) {
-        loot = 150 + Math.floor(Math.random() * 350);
-        player.florins += loot;
-        savePlayer(player);
+      let extra = '';
+      if (result.victory && result.conquered) {
+        const name = REGIONS[result.conquered]?.name || result.conquered;
+        extra = `\n\n🗺️ Захвачен регион: **${name}**! Смотри `/map``;
+      } else if (result.victory) {
+        extra = '\n\n(Соседних свободных регионов нет — карта уже твоя или упёрся в край)';
       }
 
       const embed = new EmbedBuilder()
@@ -216,7 +331,8 @@ client.on('interactionCreate', async interaction => {
         )
         .setDescription(
           result.details.join('\n') +
-          (result.victory ? `\n\n💰 Трофеи: **+${loot}** флоринов` : '\n\nАрмия понесла тяжёлые потери.')
+          (result.victory ? `\n\n💰 Трофеи: **+${result.loot}** флоринов` : '\n\nАрмия понесла тяжёлые потери.') +
+          extra
         );
 
       return interaction.reply({ embeds: [embed] });
@@ -236,7 +352,12 @@ client.on('interactionCreate', async interaction => {
           { name: 'Рост населения', value: `+${growth}`, inline: true },
           { name: 'Текущие флорины', value: `${player.florins}`, inline: true },
           { name: 'Население', value: `${player.population}`, inline: true },
-          { name: 'Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true }
+          { name: 'Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true },
+          {
+            name: 'Регионы',
+            value: String(Object.values(player.regions || {}).filter(Boolean).length),
+            inline: true
+          }
         )
         .setFooter({ text: `Теперь ход ${player.turn}` });
 
