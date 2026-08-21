@@ -87,7 +87,6 @@ client.on('interactionCreate', async interaction => {
   const command = interaction.commandName;
 
   try {
-    // ── /echo ──
     if (command === 'echo') {
       const target = interaction.options.getUser('user', true);
       const text = interaction.options.getString('message', true);
@@ -133,7 +132,6 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
-    // ── /start ──
     if (command === 'start') {
       if (getPlayer(userId)) {
         return replyEmbed(
@@ -152,7 +150,7 @@ client.on('interactionCreate', async interaction => {
       const embed = baseEmbed(`${faction.emoji} ${GAME_NAME}`, faction.color)
         .setDescription(
           `Ты — правитель **${faction.name}**.\n` +
-            'Смесь стратегии, национальных фокусов и жизни лорда.'
+            '**Scripta Belli** — писания войны: стратегия, фокусы державы и путь лорда.'
         )
         .addFields(
           { name: '⛪ Религия', value: faction.religion, inline: true },
@@ -164,8 +162,8 @@ client.on('interactionCreate', async interaction => {
             value: [
               '`/status` — империя',
               '`/ruler` — навыки и PP',
-              '`/focus` — национальный фокус (HOI4)',
-              '`/companion` — компаньон (M&B)',
+              '`/focus` — национальный фокус',
+              '`/companion` — компаньон',
               '`/caravan` — торговля',
               '`/battle` → `/endturn` — война и сезон'
             ].join('\n')
@@ -176,14 +174,13 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /help ──
     if (command === 'help') {
       const embed = baseEmbed(`📜 ${GAME_NAME} — Справка`, COLORS.parchment)
         .setDescription(
-          '**Iron Crown** — новая игра:\n' +
-            '• стратегия и карта (Total War)\n' +
-            '• Political Power, фокусы, org, stability (HOI4)\n' +
-            '• навыки правителя, компаньоны, караваны, промоут войск (Mount & Blade)'
+          '**Scripta Belli** («Писания войны»):\n' +
+            '• стратегия и карта\n' +
+            '• Political Power, фокусы, org, stability\n' +
+            '• навыки правителя, компаньоны, караваны, промоут войск'
         )
         .addFields(
           {
@@ -195,11 +192,11 @@ client.on('interactionCreate', async interaction => {
             value: '`/army` `/recruit` `/battle` — org, ветераны, регионы'
           },
           {
-            name: '🧠 HOI4',
+            name: '🧠 Держава',
             value: '`/focus` — Industrial, Military Reform, Propaganda…\n`/ruler` — PP, Stability, War Support, Organization'
           },
           {
-            name: '🗡️ Mount & Blade',
+            name: '🗡️ Путь лорда',
             value: '`/companion` — нанять героя\n`/caravan` — риск/прибыль\nНавыки качаются от действий\nВетераны промоутятся после боёв'
           },
           { name: '🎭 Фан', value: '`/echo @user текст`' }
@@ -214,7 +211,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, errorEmbed('Сначала `/start`.'), { ephemeral: true });
     }
 
-    // ── /status ──
     if (command === 'status') {
       const income = calculateIncome(player);
       const upkeep = calculateUpkeep(player);
@@ -258,7 +254,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /ruler ──
     if (command === 'ruler') {
       const s = player.skills || {};
       const lines = Object.entries(SKILLS).map(([k, v]) => {
@@ -277,7 +272,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /focus ──
     if (command === 'focus') {
       const key = interaction.options.getString('name');
       const result = startFocus(player, key);
@@ -297,7 +291,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /companion ──
     if (command === 'companion') {
       const id = interaction.options.getString('name');
       const result = hireCompanion(player, id);
@@ -306,10 +299,7 @@ client.on('interactionCreate', async interaction => {
       }
       player = getPlayer(userId);
       const c = result.companion;
-      const embed = successEmbed(
-        `${c.emoji} ${c.name}`,
-        c.description
-      )
+      const embed = successEmbed(`${c.emoji} ${c.name}`, c.description)
         .addFields(
           { name: 'Цена', value: `${c.cost}`, inline: true },
           { name: 'Upkeep', value: `${c.upkeep}/ход`, inline: true },
@@ -319,7 +309,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /caravan ──
     if (command === 'caravan') {
       const result = runCaravan(player);
       if (!result.success) {
@@ -344,7 +333,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /map ──
     if (command === 'map') {
       await interaction.deferReply();
       try {
@@ -360,9 +348,7 @@ client.on('interactionCreate', async interaction => {
         const faction = FACTIONS[player.faction];
         const embed = factionEmbed(player, `🗺️ Карта — ${faction.name}`)
           .setDescription(
-            regionList.length
-              ? `**${regionList.join(' • ')}**`
-              : 'Нет регионов.'
+            regionList.length ? `**${regionList.join(' • ')}**` : 'Нет регионов.'
           )
           .addFields(
             { name: 'Регионов', value: `${regionList.length}`, inline: true },
@@ -382,7 +368,6 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
-    // ── /army ──
     if (command === 'army') {
       if (!player.army.length) {
         return replyEmbed(
@@ -405,9 +390,7 @@ client.on('interactionCreate', async interaction => {
           '` DEF `' +
           (def?.defense ?? '?') +
           '`' +
-          (def?.promotesTo && (u.experience || 0) >= 4
-            ? ' · _готов к промоуту_'
-            : '')
+          (def?.promotesTo && (u.experience || 0) >= 4 ? ' · _готов к промоуту_' : '')
         );
       });
       const embed = factionEmbed(player, '⚔️ Армия')
@@ -420,7 +403,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /recruit ──
     if (command === 'recruit') {
       const unitKey = interaction.options.getString('unit');
       const amount = interaction.options.getInteger('amount') || 1;
@@ -440,7 +422,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /build ──
     if (command === 'build') {
       const buildingKey = interaction.options.getString('building');
       const building = BUILDINGS[buildingKey];
@@ -456,7 +437,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /battle ──
     if (command === 'battle') {
       if (!player.army.length) {
         return replyEmbed(interaction, errorEmbed('Нет армии. `/recruit`.'), { ephemeral: true });
@@ -512,7 +492,7 @@ client.on('interactionCreate', async interaction => {
         }
         if (result.promoted?.length) {
           embed.addFields({
-            name: '⬆️ Промоут (M&B)',
+            name: '⬆️ Промоут',
             value: result.promoted.join('\n')
           });
         }
@@ -524,7 +504,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /endturn ──
     if (command === 'endturn') {
       const prev = player.turn;
       const { income, upkeep, growth, ppGain, leveled } = endTurn(player);
@@ -557,7 +536,6 @@ client.on('interactionCreate', async interaction => {
       return replyEmbed(interaction, embed);
     }
 
-    // ── /reset ──
     if (command === 'reset') {
       const embed = baseEmbed('⚠️ Сброс', COLORS.warn)
         .setDescription('Удалить кампанию целиком?')
