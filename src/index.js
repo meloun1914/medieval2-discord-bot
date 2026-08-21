@@ -30,6 +30,62 @@ const {
 const { deletePlayer } = require('./game/database');
 const { generateMapImage, REGIONS, startingRegions } = require('./game/map');
 
+/* ───────────────── Embed helpers ───────────────── */
+
+const COLORS = {
+  gold: 0xC9A227,
+  success: 0x2ECC71,
+  danger: 0xE74C3C,
+  warn: 0xF39C12,
+  info: 0x3498DB,
+  dark: 0x2C3E50,
+  parchment: 0xD4A574,
+  purple: 0x9B59B6
+};
+
+function baseEmbed(title, color = COLORS.gold) {
+  return new EmbedBuilder()
+    .setTitle(title)
+    .setColor(color)
+    .setTimestamp();
+}
+
+function errorEmbed(description) {
+  return baseEmbed('⚠️ Ошибка', COLORS.danger)
+    .setDescription(description)
+    .setFooter({ text: 'Medieval II Bot' });
+}
+
+function successEmbed(title, description) {
+  return baseEmbed(title, COLORS.success)
+    .setDescription(description)
+    .setFooter({ text: 'Medieval II Bot' });
+}
+
+function infoEmbed(title, description) {
+  return baseEmbed(title, COLORS.info)
+    .setDescription(description)
+    .setFooter({ text: 'Medieval II Bot' });
+}
+
+function factionEmbed(player, title) {
+  const faction = FACTIONS[player.faction];
+  return baseEmbed(title || `${faction.emoji} ${faction.name}`, faction.color)
+    .setFooter({
+      text: `${faction.name} • Ход ${player.turn} • Medieval II Bot`
+    });
+}
+
+async function replyEmbed(interaction, embeds, options = {}) {
+  const payload = { embeds: Array.isArray(embeds) ? embeds : [embeds], ...options };
+  if (interaction.deferred || interaction.replied) {
+    return interaction.editReply(payload);
+  }
+  return interaction.reply(payload);
+}
+
+/* ───────────────── Bot ───────────────── */
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -55,15 +111,21 @@ client.on('interactionCreate', async interaction => {
       const text = interaction.options.getString('message', true);
 
       if (!interaction.guild) {
-        return interaction.reply({ content: 'Только на сервере.', ephemeral: true });
+        return replyEmbed(interaction, errorEmbed('Команда `/echo` работает только на сервере.'), {
+          ephemeral: true
+        });
       }
 
       const me = interaction.guild.members.me;
       if (!me?.permissions.has(PermissionFlagsBits.ManageWebhooks)) {
-        return interaction.reply({
-          content: 'Мне нужно право **Manage Webhooks**, чтобы работать /echo.',
-          ephemeral: true
-        });
+        return replyEmbed(
+          interaction,
+          errorEmbed(
+            'Мне нужно право **Manage Webhooks**, чтобы писать от лица участников.\n' +
+            'Попроси админа выдать его боту.'
+          ),
+          { ephemeral: true }
+        );
       }
 
       let displayName = target.username;
@@ -93,12 +155,19 @@ client.on('interactionCreate', async interaction => {
           avatarURL
         });
 
-        await interaction.editReply({ content: '✅ Сообщение отправлено.' });
+        await replyEmbed(
+          interaction,
+          successEmbed(
+            '🎭 Echo отправлен',
+            `Сообщение отправлено от лица **${displayName}**.\nВременный webhook удалён.`
+          )
+        );
       } catch (err) {
         console.error('echo error', err);
-        await interaction.editReply({
-          content: 'Не удалось создать/отправить через вебхук. Проверь права бота.'
-        });
+        await replyEmbed(
+          interaction,
+          errorEmbed('Не удалось создать или отправить webhook. Проверь права бота в этом канале.')
+        );
       } finally {
         if (webhook) {
           await webhook.delete('echo cleanup').catch(() => {});
@@ -111,10 +180,15 @@ client.on('interactionCreate', async interaction => {
     if (command === 'start') {
       const existing = getPlayer(userId);
       if (existing) {
-        return interaction.reply({
-          content: 'У тебя уже есть кампания! Используй /status или /reset чтобы начать заново.',
-          ephemeral: true
-        });
+        return replyEmbed(
+          interaction,
+          errorEmbed(
+            'У тебя уже есть активная кампания.\n' +
+            'Посмотри прогресс: `/status`\n' +
+            'Начать заново: `/reset`'
+          ),
+          { ephemeral: true }
+        );
       }
 
       const factionKey = interaction.options.getString('faction');
@@ -124,73 +198,75 @@ client.on('interactionCreate', async interaction => {
         .map(id => REGIONS[id]?.name || id)
         .join(', ');
 
-      const embed = new EmbedBuilder()
-        .setTitle(`${faction.emoji} Кампания начата: ${faction.name}`)
-        .setColor(faction.color)
-        .setDescription(
-          [
-            'Добро пожаловать, правитель!',
-            '',
-            `**Религия:** ${faction.religion}`,
-            `**Стартовые флорины:** ${faction.startingFlorins}`,
-            `**Сильные стороны:** ${faction.strengths}`,
-            `**Стартовый регион:** ${regionNames || '—'}`,
-            '',
-            'Побеждай в боях, чтобы захватывать соседние регионы.',
-            'Карта мира: `/map`'
-          ].join('\n')
+      const embed = baseEmbed(`${faction.emoji} Кампания начата`, faction.color)
+        .setDescription(`Добро пожаловать, правитель **${faction.name}**!`)
+        .addFields(
+          { name: '⛪ Религия', value: faction.religion, inline: true },
+          { name: '💰 Казна', value: `${faction.startingFlorins} флоринов`, inline: true },
+          { name: '🗺️ Стартовый регион', value: regionNames || '—', inline: true },
+          { name: '⚔️ Сильные стороны', value: faction.strengths },
+          {
+            name: '📜 С чего начать',
+            value:
+              '• `/status` — обзор империи\n' +
+              '• `/recruit` — нанять войска\n' +
+              '• `/build` — построить здание\n' +
+              '• `/battle` — сразиться и расширяться\n' +
+              '• `/map` — карта мира\n' +
+              '• `/endturn` — завершить ход'
+          }
         )
-        .addFields({
-          name: 'Основные команды',
-          value: '`/status` `/map` `/recruit` `/build` `/battle` `/endturn` `/army` `/echo` `/help`'
-        })
-        .setFooter({ text: 'Medieval II Discord Bot • Ход 1' });
+        .setFooter({ text: 'Medieval II Discord Bot • Ход 1' })
+        .setTimestamp();
 
-      return interaction.reply({ embeds: [embed] });
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /help ==========
     if (command === 'help') {
-      const embed = new EmbedBuilder()
-        .setTitle('📜 Medieval II Bot — Справка')
-        .setColor(0x8B4513)
-        .setDescription(
-          [
-            'Бот симулирует упрощённые механики **Medieval II: Total War**.',
-            '',
-            '### Кампания',
-            '`/start` — начать (выбор фракции)',
-            '`/status` — обзор империи',
-            '`/map` — карта мира (Pillow)',
-            '`/army` — состав армии',
-            '`/recruit` — нанять юнитов',
-            '`/build` — построить здание',
-            '`/battle` — бой + шанс захватить регион',
-            '`/endturn` — завершить ход',
-            '`/reset` — сбросить кампанию',
-            '',
-            '### Фан',
-            '`/echo @user текст` — сообщение от лица участника (временный webhook)',
-            '',
-            '### Механики',
-            '• Флорины, здания, upkeep',
-            '• Регионы на карте (доход + визуализация)',
-            '• Поселение: Village → City',
-            '• Битвы с потерями и экспансией'
-          ].join('\n')
+      const embed = baseEmbed('📜 Medieval II Bot — Справка', COLORS.parchment)
+        .setDescription('Упрощённые механики **Medieval II: Total War** прямо в Discord.')
+        .addFields(
+          {
+            name: '🏰 Кампания',
+            value:
+              '`/start` — начать кампанию\n' +
+              '`/status` — статус империи\n' +
+              '`/map` — карта мира (Pillow)\n' +
+              '`/army` — состав армии\n' +
+              '`/recruit` — нанять юнитов\n' +
+              '`/build` — построить здание\n' +
+              '`/battle` — бой + захват региона\n' +
+              '`/endturn` — завершить ход\n' +
+              '`/reset` — сбросить кампанию'
+          },
+          {
+            name: '🎭 Фан',
+            value: '`/echo @user текст` — сообщение от лица участника (временный webhook)'
+          },
+          {
+            name: '⚙️ Механики',
+            value:
+              '• Флорины, здания, upkeep армии\n' +
+              '• Регионы на карте (+доход)\n' +
+              '• Рост поселения: Village → City\n' +
+              '• Битвы с потерями, трофеями и экспансией'
+          }
         )
-        .setFooter({ text: 'Удачи, король!' });
+        .setFooter({ text: 'Удачи, король! • Medieval II Bot' })
+        .setTimestamp();
 
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return replyEmbed(interaction, embed, { ephemeral: true });
     }
 
     const needsPlayer = !['help', 'echo'].includes(command);
     let player = getPlayer(userId);
     if (needsPlayer && !player) {
-      return interaction.reply({
-        content: 'Сначала начни кампанию командой `/start`!',
-        ephemeral: true
-      });
+      return replyEmbed(
+        interaction,
+        errorEmbed('Сначала начни кампанию командой `/start`.'),
+        { ephemeral: true }
+      );
     }
 
     // ========== /status ==========
@@ -201,30 +277,42 @@ client.on('interactionCreate', async interaction => {
       const net = income - upkeep;
 
       const buildingsList = player.buildings.length
-        ? player.buildings.map(b => BUILDINGS[b]?.name || b).join(', ')
-        : 'Нет';
+        ? player.buildings.map(b => `• ${BUILDINGS[b]?.name || b}`).join('\n')
+        : '_пока нет_';
 
       const regionList = Object.keys(player.regions || {})
         .filter(id => player.regions[id])
         .map(id => REGIONS[id]?.name || id);
 
-      const embed = new EmbedBuilder()
-        .setTitle(`${faction.emoji} ${faction.name} — Ход ${player.turn}`)
-        .setColor(faction.color)
-        .addFields(
-          { name: '💰 Флорины', value: `${player.florins}`, inline: true },
-          { name: '📈 Доход / Ход', value: `+${income}`, inline: true },
-          { name: '📉 Upkeep', value: `-${upkeep}`, inline: true },
-          { name: '⚖️ Чистый доход', value: `${net >= 0 ? '+' : ''}${net}`, inline: true },
-          { name: '👥 Население', value: `${player.population}`, inline: true },
-          { name: '🏰 Поселение', value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel, inline: true },
-          { name: '🗺️ Регионы', value: regionList.length ? regionList.join(', ') : 'Нет' },
-          { name: '🏗️ Здания', value: buildingsList },
-          { name: '⚔️ Армия', value: `${player.army.reduce((s, u) => s + (u.count || 1), 0)} юнитов` }
-        )
-        .setFooter({ text: `Последняя активность: ${new Date(player.lastActive).toLocaleString('ru-RU')}` });
+      const armySize = player.army.reduce((s, u) => s + (u.count || 1), 0);
 
-      return interaction.reply({ embeds: [embed] });
+      const embed = factionEmbed(player)
+        .setDescription(`Обзор империи на **ходе ${player.turn}**`)
+        .addFields(
+          { name: '💰 Флорины', value: `**${player.florins}**`, inline: true },
+          { name: '📈 Доход', value: `+${income}`, inline: true },
+          { name: '📉 Upkeep', value: `−${upkeep}`, inline: true },
+          {
+            name: '⚖️ Чистыми',
+            value: net >= 0 ? `**+${net}**` : `**${net}**`,
+            inline: true
+          },
+          { name: '👥 Население', value: `${player.population}`, inline: true },
+          {
+            name: '🏰 Поселение',
+            value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel,
+            inline: true
+          },
+          {
+            name: `🗺️ Регионы (${regionList.length})`,
+            value: regionList.length ? regionList.join(', ') : '_нет_'
+          },
+          { name: '🏗️ Здания', value: buildingsList, inline: true },
+          { name: '⚔️ Армия', value: `**${armySize}** / 20 юнитов`, inline: true }
+        )
+        .setTimestamp();
+
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /map ==========
@@ -242,27 +330,36 @@ client.on('interactionCreate', async interaction => {
 
         const regionList = Object.keys(player.regions)
           .filter(id => player.regions[id])
-          .map(id => REGIONS[id]?.name || id)
-          .join(', ');
+          .map(id => REGIONS[id]?.name || id);
 
-        const embed = new EmbedBuilder()
-          .setTitle(`🗺️ Карта мира — ${FACTIONS[player.faction]?.name}`)
-          .setColor(FACTIONS[player.faction]?.color || 0x8B4513)
-          .setDescription('**Контроль:** ' + (regionList || '—') + '\n**Ход:** ' + player.turn)
+        const faction = FACTIONS[player.faction];
+        const embed = factionEmbed(player, `🗺️ Карта мира — ${faction.name}`)
+          .setDescription(
+            regionList.length
+              ? `Территории под контролем:\n**${regionList.join(' • ')}**`
+              : 'Пока нет захваченных регионов.'
+          )
+          .addFields(
+            { name: '📍 Регионов', value: `${regionList.length}`, inline: true },
+            { name: '⏳ Ход', value: `${player.turn}`, inline: true },
+            { name: '💰 Казна', value: `${player.florins}`, inline: true }
+          )
           .setImage('attachment://world_map.png')
-          .setFooter({ text: 'Сгенерировано через Pillow' });
+          .setFooter({ text: `Pillow • ${faction.name} • Medieval II Bot` });
 
         await interaction.editReply({ embeds: [embed], files: [file] });
-
         setTimeout(() => fs.unlink(imgPath, () => {}), 60_000);
       } catch (err) {
         console.error('map error', err);
-        await interaction.editReply({
-          content:
-            'Не удалось сгенерировать карту. Убедись, что установлен **Python 3** и **Pillow**:\n```\npip install pillow\n```\nОшибка: `' +
-            String(err.message).slice(0, 200) +
-            '`'
-        });
+        await replyEmbed(
+          interaction,
+          errorEmbed(
+            'Не удалось сгенерировать карту.\n\n' +
+            'Нужны **Python 3** и **Pillow**:\n' +
+            '```\npip install pillow\n```\n' +
+            `Детали: \`${String(err.message).slice(0, 180)}\``
+          )
+        );
       }
       return;
     }
@@ -270,126 +367,244 @@ client.on('interactionCreate', async interaction => {
     // ========== /army ==========
     if (command === 'army') {
       if (player.army.length === 0) {
-        return interaction.reply('Армия пуста. Нанимай юнитов через `/recruit`.');
+        return replyEmbed(
+          interaction,
+          infoEmbed(
+            '⚔️ Армия пуста',
+            'У тебя пока нет войск.\nНанимай через `/recruit`.'
+          ),
+          { ephemeral: true }
+        );
       }
 
-      const lines = player.army.map(u => {
+      const total = player.army.reduce((s, u) => s + (u.count || 1), 0);
+      const lines = player.army.map((u, i) => {
         const def = UNIT_TYPES[u.unit];
         const exp = u.experience ? ` ★${u.experience}` : '';
-        return `**${def?.name || u.unit}** x${u.count || 1}${exp} — ATK ${def?.attack} / DEF ${def?.defense}`;
+        const typeIcon =
+          def?.type === 'cavalry' ? '🐴' :
+          def?.type === 'missile' ? '🏹' : '🛡️';
+        return (
+          `**${i + 1}.** ${typeIcon} **${def?.name || u.unit}** ×${u.count || 1}${exp}\n` +
+          `  ATK \\`${def?.attack ?? '?'}\\`  DEF \\`${def?.defense ?? '?'}\\`  Upkeep \\`${(def?.upkeep || 0) * (u.count || 1)}\\``
+        );
       });
 
-      const embed = new EmbedBuilder()
-        .setTitle('⚔️ Твоя армия')
-        .setColor(0x8B0000)
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: `Всего: ${player.army.reduce((s, u) => s + (u.count || 1), 0)} / 20` });
+      const embed = factionEmbed(player, '⚔️ Состав армии')
+        .setDescription(lines.join('\n\n'))
+        .addFields(
+          { name: 'Численность', value: `**${total}** / 20`, inline: true },
+          { name: 'Upkeep', value: `**${calculateUpkeep(player)}**/ход`, inline: true }
+        )
+        .setTimestamp();
 
-      return interaction.reply({ embeds: [embed] });
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /recruit ==========
     if (command === 'recruit') {
       const unitKey = interaction.options.getString('unit');
       const amount = interaction.options.getInteger('amount') || 1;
-
+      const unitDef = UNIT_TYPES[unitKey];
       const result = recruitUnit(player, unitKey, amount);
-      return interaction.reply({
-        content: result.message,
-        ephemeral: !result.success
-      });
+
+      if (!result.success) {
+        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
+      }
+
+      // refresh player after recruit
+      player = getPlayer(userId);
+      const embed = successEmbed(
+        '🎖️ Войска наняты',
+        `**${amount}× ${unitDef?.name || unitKey}** вступили в армию.`
+      )
+        .addFields(
+          { name: '💰 Потрачено', value: `${(unitDef?.cost || 0) * amount}`, inline: true },
+          { name: 'Казна', value: `${player.florins}`, inline: true },
+          {
+            name: 'Армия',
+            value: `${player.army.reduce((s, u) => s + (u.count || 1), 0)} / 20`,
+            inline: true
+          }
+        )
+        .setColor(FACTIONS[player.faction]?.color || COLORS.success)
+        .setFooter({ text: `${FACTIONS[player.faction]?.name || ''} • Medieval II Bot` })
+        .setTimestamp();
+
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /build ==========
     if (command === 'build') {
       const buildingKey = interaction.options.getString('building');
+      const building = BUILDINGS[buildingKey];
       const result = buildBuilding(player, buildingKey);
-      return interaction.reply({
-        content: result.message,
-        ephemeral: !result.success
-      });
+
+      if (!result.success) {
+        return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
+      }
+
+      player = getPlayer(userId);
+      const embed = successEmbed(
+        '🏗️ Строительство завершено',
+        `Построено: **${building?.name || buildingKey}**`
+      )
+        .addFields(
+          { name: '💰 Стоимость', value: `${building?.cost ?? '?'}`, inline: true },
+          { name: 'Казна', value: `${player.florins}`, inline: true },
+          {
+            name: 'Эффект',
+            value: building?.incomeBonus
+              ? `+${building.incomeBonus} дохода`
+              : building?.unlocks
+                ? `Открывает: ${building.unlocks.map(u => UNIT_TYPES[u]?.name || u).join(', ')}`
+                : building?.description || '—'
+          }
+        )
+        .setColor(FACTIONS[player.faction]?.color || COLORS.success)
+        .setFooter({ text: `${FACTIONS[player.faction]?.name || ''} • Medieval II Bot` })
+        .setTimestamp();
+
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /battle ==========
     if (command === 'battle') {
       if (player.army.length === 0) {
-        return interaction.reply({ content: 'У тебя нет армии!', ephemeral: true });
+        return replyEmbed(
+          interaction,
+          errorEmbed('У тебя нет армии! Сначала `/recruit`.'),
+          { ephemeral: true }
+        );
       }
 
       const result = resolveBattle(player);
+      player = getPlayer(userId);
 
-      let extra = '';
-      if (result.victory && result.conquered) {
-        const name = REGIONS[result.conquered]?.name || result.conquered;
-        extra = '\n\n🗺️ Захвачен регион: **' + name + '**! Смотри `/map`';
-      } else if (result.victory) {
-        extra = '\n\n(Соседних свободных регионов нет — карта уже твоя или упёрся в край)';
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle(result.victory ? '🏆 Победа!' : '💀 Поражение...')
-        .setColor(result.victory ? 0x228B22 : 0x8B0000)
-        .addFields(
-          { name: 'Твоя сила', value: `${result.playerPower} (бросок ${result.playerRoll})`, inline: true },
-          { name: 'Сила врага', value: `${result.enemyPower} (бросок ${result.enemyRoll})`, inline: true },
-          { name: 'Потери', value: `~${Math.round(result.casualtiesPercent * 100)}% армии`, inline: true }
-        )
+      const embed = baseEmbed(
+        result.victory ? '🏆 Победа на поле боя!' : '💀 Поражение...',
+        result.victory ? COLORS.success : COLORS.danger
+      )
         .setDescription(
-          result.details.join('\n') +
-          (result.victory
-            ? '\n\n💰 Трофеи: **+' + result.loot + '** флоринов'
-            : '\n\nАрмия понесла тяжёлые потери.') +
-          extra
+          result.victory
+            ? 'Вражеская армия разбита. Твои войска стоят крепко.'
+            : 'Враг оказался сильнее. Армия понесла тяжёлые потери.'
+        )
+        .addFields(
+          {
+            name: '⚔️ Твоя сила',
+            value: `**${result.playerPower}**\nбросок \`${result.playerRoll}\``,
+            inline: true
+          },
+          {
+            name: '☠️ Сила врага',
+            value: `**${result.enemyPower}**\nбросок \`${result.enemyRoll}\``,
+            inline: true
+          },
+          {
+            name: '🩸 Потери',
+            value: `**~${Math.round(result.casualtiesPercent * 100)}%** армии`,
+            inline: true
+          },
+          {
+            name: '📋 Состав в бою',
+            value: result.details.slice(0, 8).join('\n') || '—'
+          }
         );
 
-      return interaction.reply({ embeds: [embed] });
+      if (result.victory) {
+        embed.addFields({
+          name: '💰 Трофеи',
+          value: `**+${result.loot}** флоринов`,
+          inline: true
+        });
+        if (result.conquered) {
+          const name = REGIONS[result.conquered]?.name || result.conquered;
+          embed.addFields({
+            name: '🗺️ Экспансия',
+            value: `Захвачен регион **${name}**!\nСмотри на карте: `/map``,
+            inline: true
+          });
+        } else {
+          embed.addFields({
+            name: '🗺️ Экспансия',
+            value: '_Свободных соседей нет_',
+            inline: true
+          });
+        }
+      }
+
+      embed
+        .setFooter({
+          text: `${FACTIONS[player.faction]?.name || ''} • Казна: ${player.florins} • Medieval II Bot`
+        })
+        .setTimestamp();
+
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /endturn ==========
     if (command === 'endturn') {
+      const prevTurn = player.turn;
       const { income, upkeep, growth } = endTurn(player);
+      player = getPlayer(userId);
+      const net = income - upkeep;
 
-      const embed = new EmbedBuilder()
-        .setTitle(`⏳ Ход ${player.turn - 1} завершён`)
-        .setColor(0x4169E1)
+      const embed = factionEmbed(player, `⏳ Ход ${prevTurn} завершён`)
+        .setDescription('Империя прожила ещё один сезон.')
         .addFields(
-          { name: 'Доход', value: `+${income}`, inline: true },
-          { name: 'Upkeep', value: `-${upkeep}`, inline: true },
-          { name: 'Чистыми', value: `${income - upkeep >= 0 ? '+' : ''}${income - upkeep}`, inline: true },
-          { name: 'Рост населения', value: `+${growth}`, inline: true },
-          { name: 'Текущие флорины', value: `${player.florins}`, inline: true },
-          { name: 'Население', value: `${player.population}`, inline: true },
+          { name: '📈 Доход', value: `+**${income}**`, inline: true },
+          { name: '📉 Upkeep', value: `−**${upkeep}**`, inline: true },
           {
-            name: 'Поселение',
+            name: '⚖️ Итого',
+            value: net >= 0 ? `+**${net}**` : `**${net}**`,
+            inline: true
+          },
+          { name: '👥 Рост населения', value: `+${growth}`, inline: true },
+          { name: '💰 Казна', value: `**${player.florins}**`, inline: true },
+          { name: '👥 Население', value: `**${player.population}**`, inline: true },
+          {
+            name: '🏰 Поселение',
             value: SETTLEMENT_LEVELS[player.settlementLevel]?.name || player.settlementLevel,
             inline: true
           },
           {
-            name: 'Регионы',
+            name: '🗺️ Регионы',
             value: String(Object.values(player.regions || {}).filter(Boolean).length),
             inline: true
-          }
+          },
+          { name: '➡️ Следующий ход', value: `**${player.turn}**`, inline: true }
         )
-        .setFooter({ text: `Теперь ход ${player.turn}` });
+        .setTimestamp();
 
-      return interaction.reply({ embeds: [embed] });
+      return replyEmbed(interaction, embed);
     }
 
     // ========== /reset ==========
     if (command === 'reset') {
+      const embed = baseEmbed('⚠️ Сброс кампании', COLORS.warn)
+        .setDescription(
+          'Ты уверен? **Вся** кампания будет удалена безвозвратно:\n' +
+          'флорины, армия, здания, регионы.'
+        )
+        .setFooter({ text: 'Действие нельзя отменить • 15 секунд' })
+        .setTimestamp();
+
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('confirm_reset')
           .setLabel('Да, сбросить')
-          .setStyle(ButtonStyle.Danger),
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('🗑️'),
         new ButtonBuilder()
           .setCustomId('cancel_reset')
           .setLabel('Отмена')
           .setStyle(ButtonStyle.Secondary)
+          .setEmoji('↩️')
       );
 
       const reply = await interaction.reply({
-        content: '⚠️ Ты уверен? Вся кампания будет удалена безвозвратно.',
+        embeds: [embed],
         components: [row],
         ephemeral: true
       });
@@ -403,27 +618,42 @@ client.on('interactionCreate', async interaction => {
         if (i.customId === 'confirm_reset') {
           deletePlayer(userId);
           await i.update({
-            content: 'Кампания сброшена. Можешь начать заново через `/start`.',
+            embeds: [
+              successEmbed(
+                '🗑️ Кампания сброшена',
+                'Прогресс удалён. Начни заново через `/start`.'
+              )
+            ],
             components: []
           });
         } else {
-          await i.update({ content: 'Сброс отменён.', components: [] });
+          await i.update({
+            embeds: [
+              infoEmbed('↩️ Сброс отменён', 'Твоя империя в безопасности.')
+            ],
+            components: []
+          });
         }
       });
 
       collector.on('end', async collected => {
         if (collected.size === 0) {
-          await interaction.editReply({ content: 'Время вышло.', components: [] }).catch(() => {});
+          await interaction
+            .editReply({
+              embeds: [infoEmbed('⌛ Время вышло', 'Сброс не подтверждён.')],
+              components: []
+            })
+            .catch(() => {});
         }
       });
     }
   } catch (err) {
     console.error(err);
-    const msg = 'Произошла ошибка. Попробуй ещё раз.';
+    const embed = errorEmbed('Произошла внутренняя ошибка. Попробуй ещё раз чуть позже.');
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: msg, ephemeral: true }).catch(() => {});
+      await interaction.followUp({ embeds: [embed], ephemeral: true }).catch(() => {});
     } else {
-      await interaction.reply({ content: msg, ephemeral: true }).catch(() => {});
+      await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
     }
   }
 });
