@@ -4,164 +4,108 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const commands = [
   new SlashCommandBuilder()
     .setName('start')
-    .setDescription('Scripta Belli — начать кампанию, выбрать фракцию')
+    .setDescription('Начать кампанию Scripta Belli и выбрать фракцию')
     .addStringOption(opt =>
-      opt.setName('faction')
-        .setDescription('Фракция')
-        .setRequired(true)
+      opt.setName('faction').setDescription('Фракция').setRequired(true)
         .addChoices(
-          { name: 'England 🏴󠁧󠁢󠁥󠁮󠁧󠁿', value: 'england' },
-          { name: 'France 🇫🇷', value: 'france' },
-          { name: 'Holy Roman Empire 🦅', value: 'hre' },
-          { name: 'Venice 🦁', value: 'venice' },
-          { name: 'Byzantine Empire 🦅', value: 'byzantium' },
-          { name: 'Russia 🐻', value: 'russia' },
-          { name: 'Moors 🌙', value: 'moors' },
-          { name: 'Egypt 🏺', value: 'egypt' }
+          { name: 'Англия 🏴󠁧󠁢󠁥󠁮󠁧󠁿', value: 'england' },
+          { name: 'Франция 🇫🇷', value: 'france' },
+          { name: 'Священная Римская империя 🦅', value: 'hre' },
+          { name: 'Венеция 🦁', value: 'venice' },
+          { name: 'Византия 🦅', value: 'byzantium' },
+          { name: 'Русь 🐻', value: 'russia' },
+          { name: 'Мавры 🌙', value: 'moors' },
+          { name: 'Египет 🏺', value: 'egypt' }
         )
     ),
-
+  new SlashCommandBuilder().setName('status').setDescription('Статус империи: казна, власть, стабильность, организация'),
   new SlashCommandBuilder()
-    .setName('status')
-    .setDescription('Статус империи: казна, PP, stability, org, навыки'),
-
-  new SlashCommandBuilder()
-    .setName('recruit')
-    .setDescription('Нанять юнитов')
+    .setName('recruit').setDescription('Нанять юнитов в армию')
     .addStringOption(opt =>
-      opt.setName('unit')
-        .setDescription('Тип юнита')
-        .setRequired(true)
+      opt.setName('unit').setDescription('Тип юнита').setRequired(true)
         .addChoices(
-          { name: 'Spear Militia', value: 'spear_militia' },
-          { name: 'Peasant Archers', value: 'peasant_archers' },
-          { name: 'Spearmen', value: 'spearmen' },
-          { name: 'Feudal Knights', value: 'feudal_knights' },
-          { name: 'Dismounted Feudal Knights', value: 'dismounted_feudal_knights' },
-          { name: 'Longbowmen', value: 'longbowmen' },
-          { name: 'Chivalric Knights', value: 'chivalric_knights' },
-          { name: 'Boyar Sons', value: 'boyar_sons' },
-          { name: 'Mamluks', value: 'mamluks' },
-          { name: 'Cataphracts', value: 'cataphracts' }
+          { name: 'Копейная милиция', value: 'spear_militia' },
+          { name: 'Крестьянские лучники', value: 'peasant_archers' },
+          { name: 'Копейщики', value: 'spearmen' },
+          { name: 'Феодальные рыцари', value: 'feudal_knights' },
+          { name: 'Спешенные феодальные рыцари', value: 'dismounted_feudal_knights' },
+          { name: 'Лучники с длинным луком', value: 'longbowmen' },
+          { name: 'Рыцари-chevaliers', value: 'chivalric_knights' },
+          { name: 'Сыны боярские', value: 'boyar_sons' },
+          { name: 'Мамлюки', value: 'mamluks' },
+          { name: 'Катафракты', value: 'cataphracts' }
         )
     )
-    .addIntegerOption(opt =>
-      opt.setName('amount')
-        .setDescription('Количество')
-        .setMinValue(1)
-        .setMaxValue(5)
-    ),
-
+    .addIntegerOption(opt => opt.setName('amount').setDescription('Количество').setMinValue(1).setMaxValue(5)),
   new SlashCommandBuilder()
-    .setName('build')
-    .setDescription('Построить здание')
+    .setName('build').setDescription('Построить здание')
     .addStringOption(opt =>
-      opt.setName('building')
-        .setDescription('Здание')
-        .setRequired(true)
+      opt.setName('building').setDescription('Здание').setRequired(true)
         .addChoices(
-          { name: 'Farms', value: 'farms' },
-          { name: 'Market', value: 'market' },
-          { name: 'Barracks', value: 'barracks' },
-          { name: 'Stables', value: 'stables' },
-          { name: 'Archery Range', value: 'archery_range' },
-          { name: 'Blacksmith', value: 'blacksmith' }
+          { name: 'Фермы', value: 'farms' },
+          { name: 'Рынок', value: 'market' },
+          { name: 'Казармы', value: 'barracks' },
+          { name: 'Конюшни', value: 'stables' },
+          { name: 'Стрельбище', value: 'archery_range' },
+          { name: 'Кузница', value: 'blacksmith' }
         )
     ),
-
+  new SlashCommandBuilder().setName('battle').setDescription('Сражение: сила, организация, повышение ветеранов, захват региона'),
+  new SlashCommandBuilder().setName('map').setDescription('Карта мира'),
+  new SlashCommandBuilder().setName('endturn').setDescription('Завершить ход: доход, полит. власть, организация, фокусы'),
+  new SlashCommandBuilder().setName('army').setDescription('Состав армии и организация'),
   new SlashCommandBuilder()
-    .setName('battle')
-    .setDescription('Бой: сила, org, промоут ветеранов, захват региона'),
-
-  new SlashCommandBuilder()
-    .setName('map')
-    .setDescription('Карта мира (Pillow)'),
-
-  new SlashCommandBuilder()
-    .setName('endturn')
-    .setDescription('Завершить ход: доход, PP, org, фокусы'),
-
-  new SlashCommandBuilder()
-    .setName('army')
-    .setDescription('Состав армии и организация'),
-
-  new SlashCommandBuilder()
-    .setName('focus')
-    .setDescription('Национальный фокус за Political Power')
+    .setName('focus').setDescription('Национальный фокус за политическую власть')
     .addStringOption(opt =>
-      opt.setName('name')
-        .setDescription('Фокус')
-        .setRequired(true)
+      opt.setName('name').setDescription('Фокус').setRequired(true)
         .addChoices(
-          { name: 'Industrial Effort', value: 'industrial_effort' },
-          { name: 'Military Reform', value: 'military_reform' },
-          { name: 'War Propaganda', value: 'war_propaganda' },
-          { name: 'Grand Army', value: 'grand_army' },
-          { name: 'Diplomatic Corps', value: 'diplomatic_corps' },
-          { name: 'Total Mobilization', value: 'total_mobilization' }
+          { name: 'Промышленный рывок', value: 'industrial_effort' },
+          { name: 'Военная реформа', value: 'military_reform' },
+          { name: 'Военная пропаганда', value: 'war_propaganda' },
+          { name: 'Великая армия', value: 'grand_army' },
+          { name: 'Дипломатический корпус', value: 'diplomatic_corps' },
+          { name: 'Тотальная мобилизация', value: 'total_mobilization' }
         )
     ),
-
   new SlashCommandBuilder()
-    .setName('companion')
-    .setDescription('Нанять компаньона в отряд')
+    .setName('companion').setDescription('Нанять компаньона в отряд')
     .addStringOption(opt =>
-      opt.setName('name')
-        .setDescription('Компаньон')
-        .setRequired(true)
+      opt.setName('name').setDescription('Компаньон').setRequired(true)
         .addChoices(
-          { name: 'Sergius the Steward', value: 'sergius' },
-          { name: 'Brynhild Iron-Arm', value: 'brynhild' },
-          { name: 'Omar the Caravaner', value: 'omar' },
-          { name: 'Father Alric', value: 'father_alric' },
-          { name: 'Liao the Scout', value: 'liao' }
+          { name: 'Сергий Казначей', value: 'sergius' },
+          { name: 'Брюнхильд Железная Рука', value: 'brynhild' },
+          { name: 'Омар Караванщик', value: 'omar' },
+          { name: 'Отец Альрик', value: 'father_alric' },
+          { name: 'Ляо Разведчик', value: 'liao' }
         )
     ),
-
+  new SlashCommandBuilder().setName('caravan').setDescription('Отправить торговый караван'),
+  new SlashCommandBuilder().setName('ruler').setDescription('Навыки правителя, власть, стабильность, поддержка войны'),
   new SlashCommandBuilder()
-    .setName('caravan')
-    .setDescription('Отправить торговый караван'),
-
-  new SlashCommandBuilder()
-    .setName('ruler')
-    .setDescription('Навыки правителя, PP, stability, war support'),
-
-  new SlashCommandBuilder()
-    .setName('echo')
-    .setDescription('Сообщение от лица участника (webhook)')
-    .addUserOption(opt =>
-      opt.setName('user').setDescription('От кого').setRequired(true)
-    )
-    .addStringOption(opt =>
-      opt.setName('message').setDescription('Текст').setRequired(true).setMaxLength(2000)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('help')
-    .setDescription('Справка по Scripta Belli'),
-
-  new SlashCommandBuilder()
-    .setName('reset')
-    .setDescription('Сбросить кампанию')
+    .setName('echo').setDescription('Написать сообщение от лица участника')
+    .addUserOption(opt => opt.setName('user').setDescription('От кого').setRequired(true))
+    .addStringOption(opt => opt.setName('message').setDescription('Текст').setRequired(true).setMaxLength(2000)),
+  new SlashCommandBuilder().setName('help').setDescription('Справка по Scripta Belli'),
+  new SlashCommandBuilder().setName('reset').setDescription('Сбросить кампанию')
 ].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    console.log('Deploying Scripta Belli slash commands...');
+    console.log('Деплой команд Scripta Belli...');
     if (process.env.GUILD_ID) {
       await rest.put(
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
         { body: commands }
       );
-      console.log('Deployed to guild', process.env.GUILD_ID);
+      console.log('Задеплоено на сервер', process.env.GUILD_ID);
     } else {
       await rest.put(
         Routes.applicationCommands(process.env.CLIENT_ID),
         { body: commands }
       );
-      console.log('Deployed global commands.');
+      console.log('Глобальные команды задеплоены.');
     }
   } catch (error) {
     console.error(error);
