@@ -1,8 +1,6 @@
-# Iron Crown
+# Scripta Belli
 
-Discord-игра: **средневековая стратегия** + механики **Hearts of Iron 4** + **Mount & Blade**.
-
-Не мод к Medieval II, а отдельная игра в том же репозитории бота.
+**Scripta Belli** («Писания войны») — Discord-игра: средневековая стратегия + механики **Hearts of Iron 4** + **Mount & Blade**.
 
 ## Столпы дизайна
 
@@ -13,9 +11,9 @@ Discord-игра: **средневековая стратегия** + механ
 | Mount & Blade | Навыки правителя, компаньоны, караваны, промоут ветеранов | Ты — лорд, не только «кнопка конца хода» |
 
 Механики усиливают друг друга:
-- **Leadership** (M&B) → больше лимит армии → сильнее бои → больше регионов → больше денег.
-- **Фокус Military Reform** (HOI4) → сила армии и org → выгоднее battle.
-- **Omar-компаньон** → безопаснее caravan → флорины на PP-фокусы и войска.
+- **Leadership** → больше лимит армии → сильнее бои → больше регионов → больше денег.
+- **Фокус Military Reform** → сила армии и org → выгоднее battle.
+- **Omar** → безопаснее caravan → флорины на PP-фокусы и войска.
 - **Organization** падает после боя и растёт на endturn — нельзя спамить war без передышки.
 
 ## Команды
@@ -49,7 +47,7 @@ npm start
 
 Права бота: Send Messages, Embed Links, Use Slash Commands, **Manage Webhooks**.
 
-## Фокусы (HOI4)
+## Фокусы
 
 - Industrial Effort — доход зданий
 - Military Reform — сила армии + org
@@ -58,7 +56,7 @@ npm start
 - Diplomatic Corps — больше PP/ход
 - Total Mobilization — мощный боевой бафф ценой stability
 
-## Компаньоны (M&B)
+## Компаньоны
 
 - Sergius — экономика
 - Brynhild — сила армии
