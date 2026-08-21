@@ -71,7 +71,11 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('battle')
-    .setDescription('Сразиться с вражеской армией (симуляция)'),
+    .setDescription('Сразиться с вражеской армией (симуляция + захват региона)'),
+
+  new SlashCommandBuilder()
+    .setName('map')
+    .setDescription('Сгенерировать карту мира (Pillow) с твоими территориями'),
 
   new SlashCommandBuilder()
     .setName('endturn')
@@ -80,6 +84,21 @@ const commands = [
   new SlashCommandBuilder()
     .setName('army')
     .setDescription('Подробный состав твоей армии'),
+
+  new SlashCommandBuilder()
+    .setName('echo')
+    .setDescription('Написать сообщение от лица другого участника (webhook)')
+    .addUserOption(opt =>
+      opt.setName('user')
+        .setDescription('От чьего лица писать')
+        .setRequired(true)
+    )
+    .addStringOption(opt =>
+      opt.setName('message')
+        .setDescription('Текст сообщения')
+        .setRequired(true)
+        .setMaxLength(2000)
+    ),
 
   new SlashCommandBuilder()
     .setName('help')
@@ -97,14 +116,12 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     console.log('Deploying slash commands...');
 
     if (process.env.GUILD_ID) {
-      // Instant deploy to one guild (for testing)
       await rest.put(
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
         { body: commands }
       );
       console.log('Successfully deployed to guild', process.env.GUILD_ID);
     } else {
-      // Global commands (can take up to 1 hour)
       await rest.put(
         Routes.applicationCommands(process.env.CLIENT_ID),
         { body: commands }
