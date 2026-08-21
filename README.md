@@ -1,117 +1,70 @@
-# Medieval II: Total War Discord Bot
+# Iron Crown
 
-Бот для Discord с механиками **Medieval II: Total War**, картой мира (Pillow) и фан-командой `/echo`.
+Discord-игра: **средневековая стратегия** + механики **Hearts of Iron 4** + **Mount & Blade**.
 
-## Возможности
+Не мод к Medieval II, а отдельная игра в том же репозитории бота.
 
-- Выбор фракции (England, France, HRE, Venice, Byzantium, Russia, Moors, Egypt)
-- Экономика: флорины, доход, upkeep, бонус от регионов
-- Здания и найм юнитов
-- Битвы с потерями, трофеями и **захватом соседних регионов**
-- **Карта мира** `/map` — PNG через **Pillow** (Python)
-- Пошаговая система (`/endturn`)
-- **`/echo`** — сообщение от лица другого участника через временный webhook
+## Столпы дизайна
 
-## Установка
+| Источник | Что взяли | Как стыкуется |
+|----------|-----------|----------------|
+| Total War | Регионы, армия, здания, карта | База кампании |
+| HOI4 | Political Power, фокусы, Stability, War Support, Organization | Управляешь государством между боями |
+| Mount & Blade | Навыки правителя, компаньоны, караваны, промоут ветеранов | Ты — лорд, не только «кнопка конца хода» |
 
-### 1. Discord Developer Portal
+Механики усиливают друг друга:
+- **Leadership** (M&B) → больше лимит армии → сильнее бои → больше регионов → больше денег.
+- **Фокус Military Reform** (HOI4) → сила армии и org → выгоднее battle.
+- **Omar-компаньон** → безопаснее caravan → флорины на PP-фокусы и войска.
+- **Organization** падает после боя и растёт на endturn — нельзя спамить war без передышки.
 
-1. [Discord Developer Portal](https://discord.com/developers/applications) → New Application
-2. Bot → Add Bot → скопируй **Token**
-3. OAuth2 → URL Generator:
-   - Scopes: `bot`, `applications.commands`
-   - Permissions: `Send Messages`, `Embed Links`, `Use Slash Commands`, **`Manage Webhooks`**
-4. Добавь бота на сервер
-5. Application ID → `CLIENT_ID`
-6. (Опционально) Bot → Privileged Gateway Intents → **Server Members Intent** (для никнеймов в `/echo`)
+## Команды
 
-### 2. Клон и зависимости
+| Команда | Суть |
+|---------|------|
+| `/start` | Новая кампания |
+| `/status` | Империя + PP / stab / WS / org |
+| `/ruler` | Навыки правителя |
+| `/focus` | Национальный фокус (PP) |
+| `/companion` | Нанять компаньона (макс. 3) |
+| `/caravan` | Торговый риск/профит |
+| `/recruit` `/build` `/army` | Войска и экономика |
+| `/battle` | Бой, org, промоут, регион |
+| `/map` | Карта (Pillow) |
+| `/endturn` | Сезон: доход, PP, org, фокус |
+| `/echo` | Фан-webhook |
+| `/reset` | Сброс |
+
+## Быстрый старт
 
 ```bash
 git clone https://github.com/meloun1914/medieval2-discord-bot.git
 cd medieval2-discord-bot
 npm install
-
-# Python 3 + Pillow (для карты)
-pip install -r requirements.txt
-# или: pip install Pillow
-```
-
-### 3. `.env`
-
-```bash
-cp .env.example .env
-```
-
-```env
-DISCORD_TOKEN=...
-CLIENT_ID=...
-GUILD_ID=...          # опционально, мгновенный деплой команд
-PYTHON_PATH=python3   # опционально, если python не в PATH
-```
-
-### 4. Деплой команд и запуск
-
-```bash
+pip install -r requirements.txt   # для /map
+cp .env.example .env              # TOKEN + CLIENT_ID
 npm run deploy-commands
 npm start
 ```
 
-## Команды
+Права бота: Send Messages, Embed Links, Use Slash Commands, **Manage Webhooks**.
 
-| Команда | Описание |
-|---------|----------|
-| `/start` | Начать кампанию |
-| `/status` | Статус империи + регионы |
-| `/map` | Карта мира (Pillow PNG) |
-| `/army` | Состав армии |
-| `/recruit` | Нанять юнитов |
-| `/build` | Построить здание |
-| `/battle` | Бой + шанс захватить регион |
-| `/endturn` | Завершить ход |
-| `/echo` | Сообщение от лица @user |
-| `/help` | Справка |
-| `/reset` | Сбросить кампанию |
+## Фокусы (HOI4)
 
-## Как работает карта
+- Industrial Effort — доход зданий
+- Military Reform — сила армии + org
+- War Propaganda — War Support / Stability
+- Grand Army — дешевле upkeep
+- Diplomatic Corps — больше PP/ход
+- Total Mobilization — мощный боевой бафф ценой stability
 
-1. При `/start` фракция получает стартовый регион (London, Paris, Novgorod…).
-2. Победа в `/battle` с шансом захватывает **соседний** свободный регион.
-3. `/map` вызывает `scripts/generate_map.py` (Pillow), рисует регионы цветами фракций и шлёт PNG в Discord.
-4. Каждый регион даёт +80 флоринов к доходу за ход.
+## Компаньоны (M&B)
 
-## Как работает `/echo`
-
-1. Бот создаёт **временный webhook** в канале с ником и аватаркой выбранного участника.
-2. Отправляет сообщение от его лица.
-3. Сразу **удаляет** webhook.
-
-Нужно право бота **Manage Webhooks**.
-
-## Структура
-
-```
-medieval2-discord-bot/
-├── scripts/
-│   └── generate_map.py       # Pillow генератор карты
-├── src/
-│   ├── index.js
-│   ├── deploy-commands.js
-│   └── game/
-│       ├── data.js
-│       ├── database.js
-│       ├── engine.js
-│       └── map.js            # регионы + вызов Python
-├── requirements.txt
-├── package.json
-└── README.md
-```
-
-## Технологии
-
-- discord.js v14 (slash commands, embeds, webhooks, attachments)
-- better-sqlite3
-- Python 3 + **Pillow**
+- Sergius — экономика
+- Brynhild — сила армии
+- Omar — караваны
+- Father Alric — stability
+- Liao — восстановление org после боя
 
 ## Лицензия
 
