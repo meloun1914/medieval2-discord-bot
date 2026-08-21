@@ -111,9 +111,11 @@ client.on('interactionCreate', async interaction => {
       const text = interaction.options.getString('message', true);
 
       if (!interaction.guild) {
-        return replyEmbed(interaction, errorEmbed('Команда `/echo` работает только на сервере.'), {
-          ephemeral: true
-        });
+        return replyEmbed(
+          interaction,
+          errorEmbed('Команда `/echo` работает только на сервере.'),
+          { ephemeral: true }
+        );
       }
 
       const me = interaction.guild.members.me;
@@ -122,7 +124,7 @@ client.on('interactionCreate', async interaction => {
           interaction,
           errorEmbed(
             'Мне нужно право **Manage Webhooks**, чтобы писать от лица участников.\n' +
-            'Попроси админа выдать его боту.'
+              'Попроси админа выдать его боту.'
           ),
           { ephemeral: true }
         );
@@ -184,8 +186,8 @@ client.on('interactionCreate', async interaction => {
           interaction,
           errorEmbed(
             'У тебя уже есть активная кампания.\n' +
-            'Посмотри прогресс: `/status`\n' +
-            'Начать заново: `/reset`'
+              'Посмотри прогресс: `/status`\n' +
+              'Начать заново: `/reset`'
           ),
           { ephemeral: true }
         );
@@ -207,13 +209,14 @@ client.on('interactionCreate', async interaction => {
           { name: '⚔️ Сильные стороны', value: faction.strengths },
           {
             name: '📜 С чего начать',
-            value:
-              '• `/status` — обзор империи\n' +
-              '• `/recruit` — нанять войска\n' +
-              '• `/build` — построить здание\n' +
-              '• `/battle` — сразиться и расширяться\n' +
-              '• `/map` — карта мира\n' +
+            value: [
+              '• `/status` — обзор империи',
+              '• `/recruit` — нанять войска',
+              '• `/build` — построить здание',
+              '• `/battle` — сразиться и расширяться',
+              '• `/map` — карта мира',
               '• `/endturn` — завершить ход'
+            ].join('\n')
           }
         )
         .setFooter({ text: 'Medieval II Discord Bot • Ход 1' })
@@ -229,16 +232,17 @@ client.on('interactionCreate', async interaction => {
         .addFields(
           {
             name: '🏰 Кампания',
-            value:
-              '`/start` — начать кампанию\n' +
-              '`/status` — статус империи\n' +
-              '`/map` — карта мира (Pillow)\n' +
-              '`/army` — состав армии\n' +
-              '`/recruit` — нанять юнитов\n' +
-              '`/build` — построить здание\n' +
-              '`/battle` — бой + захват региона\n' +
-              '`/endturn` — завершить ход\n' +
+            value: [
+              '`/start` — начать кампанию',
+              '`/status` — статус империи',
+              '`/map` — карта мира (Pillow)',
+              '`/army` — состав армии',
+              '`/recruit` — нанять юнитов',
+              '`/build` — построить здание',
+              '`/battle` — бой + захват региона',
+              '`/endturn` — завершить ход',
               '`/reset` — сбросить кампанию'
+            ].join('\n')
           },
           {
             name: '🎭 Фан',
@@ -246,11 +250,12 @@ client.on('interactionCreate', async interaction => {
           },
           {
             name: '⚙️ Механики',
-            value:
-              '• Флорины, здания, upkeep армии\n' +
-              '• Регионы на карте (+доход)\n' +
-              '• Рост поселения: Village → City\n' +
+            value: [
+              '• Флорины, здания, upkeep армии',
+              '• Регионы на карте (+доход)',
+              '• Рост поселения: Village → City',
               '• Битвы с потерями, трофеями и экспансией'
+            ].join('\n')
           }
         )
         .setFooter({ text: 'Удачи, король! • Medieval II Bot' })
@@ -271,7 +276,6 @@ client.on('interactionCreate', async interaction => {
 
     // ========== /status ==========
     if (command === 'status') {
-      const faction = FACTIONS[player.faction];
       const income = calculateIncome(player);
       const upkeep = calculateUpkeep(player);
       const net = income - upkeep;
@@ -354,10 +358,15 @@ client.on('interactionCreate', async interaction => {
         await replyEmbed(
           interaction,
           errorEmbed(
-            'Не удалось сгенерировать карту.\n\n' +
-            'Нужны **Python 3** и **Pillow**:\n' +
-            '```\npip install pillow\n```\n' +
-            `Детали: \`${String(err.message).slice(0, 180)}\``
+            [
+              'Не удалось сгенерировать карту.',
+              '',
+              'Нужны **Python 3** и **Pillow**:',
+              '```',
+              'pip install pillow',
+              '```',
+              'Детали: `' + String(err.message).slice(0, 180) + '`'
+            ].join('\n')
           )
         );
       }
@@ -369,10 +378,7 @@ client.on('interactionCreate', async interaction => {
       if (player.army.length === 0) {
         return replyEmbed(
           interaction,
-          infoEmbed(
-            '⚔️ Армия пуста',
-            'У тебя пока нет войск.\nНанимай через `/recruit`.'
-          ),
+          infoEmbed('⚔️ Армия пуста', 'У тебя пока нет войск.\nНанимай через `/recruit`.'),
           { ephemeral: true }
         );
       }
@@ -384,14 +390,33 @@ client.on('interactionCreate', async interaction => {
         const typeIcon =
           def?.type === 'cavalry' ? '🐴' :
           def?.type === 'missile' ? '🏹' : '🛡️';
+        const atk = def?.attack ?? '?';
+        const defv = def?.defense ?? '?';
+        const upk = (def?.upkeep || 0) * (u.count || 1);
         return (
           `**${i + 1}.** ${typeIcon} **${def?.name || u.unit}** ×${u.count || 1}${exp}\n` +
-          `  ATK \\`${def?.attack ?? '?'}\\`  DEF \\`${def?.defense ?? '?'}\\`  Upkeep \\`${(def?.upkeep || 0) * (u.count || 1)}\\``
+          `  ATK \\`${atk}\\`  DEF \\`${defv}\\`  Upkeep \\`${upk}\\``
         );
       });
 
+      // Fix: use single backticks in output string (not double-escaped)
+      const cleanLines = player.army.map((u, i) => {
+        const def = UNIT_TYPES[u.unit];
+        const exp = u.experience ? ` ★${u.experience}` : '';
+        const typeIcon =
+          def?.type === 'cavalry' ? '🐴' :
+          def?.type === 'missile' ? '🏹' : '🛡️';
+        const atk = def?.attack ?? '?';
+        const defv = def?.defense ?? '?';
+        const upk = (def?.upkeep || 0) * (u.count || 1);
+        return [
+          `**${i + 1}.** ${typeIcon} **${def?.name || u.unit}** ×${u.count || 1}${exp}`,
+          '  ATK `' + atk + '`  DEF `' + defv + '`  Upkeep `' + upk + '`'
+        ].join('\n');
+      });
+
       const embed = factionEmbed(player, '⚔️ Состав армии')
-        .setDescription(lines.join('\n\n'))
+        .setDescription(cleanLines.join('\n\n'))
         .addFields(
           { name: 'Численность', value: `**${total}** / 20`, inline: true },
           { name: 'Upkeep', value: `**${calculateUpkeep(player)}**/ход`, inline: true }
@@ -412,7 +437,6 @@ client.on('interactionCreate', async interaction => {
         return replyEmbed(interaction, errorEmbed(result.message), { ephemeral: true });
       }
 
-      // refresh player after recruit
       player = getPlayer(userId);
       const embed = successEmbed(
         '🎖️ Войска наняты',
@@ -445,6 +469,12 @@ client.on('interactionCreate', async interaction => {
       }
 
       player = getPlayer(userId);
+      let effect = '—';
+      if (building?.incomeBonus) effect = `+${building.incomeBonus} дохода`;
+      else if (building?.unlocks) {
+        effect = 'Открывает: ' + building.unlocks.map(u => UNIT_TYPES[u]?.name || u).join(', ');
+      } else if (building?.description) effect = building.description;
+
       const embed = successEmbed(
         '🏗️ Строительство завершено',
         `Построено: **${building?.name || buildingKey}**`
@@ -452,14 +482,7 @@ client.on('interactionCreate', async interaction => {
         .addFields(
           { name: '💰 Стоимость', value: `${building?.cost ?? '?'}`, inline: true },
           { name: 'Казна', value: `${player.florins}`, inline: true },
-          {
-            name: 'Эффект',
-            value: building?.incomeBonus
-              ? `+${building.incomeBonus} дохода`
-              : building?.unlocks
-                ? `Открывает: ${building.unlocks.map(u => UNIT_TYPES[u]?.name || u).join(', ')}`
-                : building?.description || '—'
-          }
+          { name: 'Эффект', value: effect }
         )
         .setColor(FACTIONS[player.faction]?.color || COLORS.success)
         .setFooter({ text: `${FACTIONS[player.faction]?.name || ''} • Medieval II Bot` })
@@ -493,17 +516,17 @@ client.on('interactionCreate', async interaction => {
         .addFields(
           {
             name: '⚔️ Твоя сила',
-            value: `**${result.playerPower}**\nбросок \`${result.playerRoll}\``,
+            value: '**' + result.playerPower + '**\nбросок `' + result.playerRoll + '`',
             inline: true
           },
           {
             name: '☠️ Сила врага',
-            value: `**${result.enemyPower}**\nбросок \`${result.enemyRoll}\``,
+            value: '**' + result.enemyPower + '**\nбросок `' + result.enemyRoll + '`',
             inline: true
           },
           {
             name: '🩸 Потери',
-            value: `**~${Math.round(result.casualtiesPercent * 100)}%** армии`,
+            value: '**~' + Math.round(result.casualtiesPercent * 100) + '%** армии',
             inline: true
           },
           {
@@ -515,14 +538,14 @@ client.on('interactionCreate', async interaction => {
       if (result.victory) {
         embed.addFields({
           name: '💰 Трофеи',
-          value: `**+${result.loot}** флоринов`,
+          value: '**+' + result.loot + '** флоринов',
           inline: true
         });
         if (result.conquered) {
           const name = REGIONS[result.conquered]?.name || result.conquered;
           embed.addFields({
             name: '🗺️ Экспансия',
-            value: `Захвачен регион **${name}**!\nСмотри на карте: `/map``,
+            value: 'Захвачен регион **' + name + '**!\nСмотри на карте: `/map`',
             inline: true
           });
         } else {
@@ -536,7 +559,11 @@ client.on('interactionCreate', async interaction => {
 
       embed
         .setFooter({
-          text: `${FACTIONS[player.faction]?.name || ''} • Казна: ${player.florins} • Medieval II Bot`
+          text:
+            (FACTIONS[player.faction]?.name || '') +
+            ' • Казна: ' +
+            player.florins +
+            ' • Medieval II Bot'
         })
         .setTimestamp();
 
@@ -585,7 +612,7 @@ client.on('interactionCreate', async interaction => {
       const embed = baseEmbed('⚠️ Сброс кампании', COLORS.warn)
         .setDescription(
           'Ты уверен? **Вся** кампания будет удалена безвозвратно:\n' +
-          'флорины, армия, здания, регионы.'
+            'флорины, армия, здания, регионы.'
         )
         .setFooter({ text: 'Действие нельзя отменить • 15 секунд' })
         .setTimestamp();
@@ -628,9 +655,7 @@ client.on('interactionCreate', async interaction => {
           });
         } else {
           await i.update({
-            embeds: [
-              infoEmbed('↩️ Сброс отменён', 'Твоя империя в безопасности.')
-            ],
+            embeds: [infoEmbed('↩️ Сброс отменён', 'Твоя империя в безопасности.')],
             components: []
           });
         }
