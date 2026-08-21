@@ -4,7 +4,7 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const commands = [
   new SlashCommandBuilder()
     .setName('start')
-    .setDescription('Iron Crown — начать кампанию, выбрать фракцию')
+    .setDescription('Scripta Belli — начать кампанию, выбрать фракцию')
     .addStringOption(opt =>
       opt.setName('faction')
         .setDescription('Фракция')
@@ -87,7 +87,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('focus')
-    .setDescription('HOI4: национальный фокус за Political Power')
+    .setDescription('Национальный фокус за Political Power')
     .addStringOption(opt =>
       opt.setName('name')
         .setDescription('Фокус')
@@ -104,7 +104,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('companion')
-    .setDescription('Mount & Blade: нанять компаньона')
+    .setDescription('Нанять компаньона в отряд')
     .addStringOption(opt =>
       opt.setName('name')
         .setDescription('Компаньон')
@@ -120,7 +120,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('caravan')
-    .setDescription('Mount & Blade: отправить торговый караван'),
+    .setDescription('Отправить торговый караван'),
 
   new SlashCommandBuilder()
     .setName('ruler')
@@ -138,7 +138,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Справка по Iron Crown'),
+    .setDescription('Справка по Scripta Belli'),
 
   new SlashCommandBuilder()
     .setName('reset')
@@ -149,7 +149,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    console.log('Deploying Iron Crown slash commands...');
+    console.log('Deploying Scripta Belli slash commands...');
     if (process.env.GUILD_ID) {
       await rest.put(
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
