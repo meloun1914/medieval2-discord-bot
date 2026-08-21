@@ -1,5 +1,6 @@
 const { FACTIONS, UNIT_TYPES, BUILDINGS, SETTLEMENT_LEVELS } = require('./data');
 const { getPlayer, createPlayer, savePlayer } = require('./database');
+const { tryExpand } = require('./map');
 
 /**
  * Calculate income per turn
@@ -17,6 +18,10 @@ function calculateIncome(player) {
       income += building.incomeBonus;
     }
   }
+
+  // Regions bonus
+  const regionCount = Object.values(player.regions || {}).filter(Boolean).length;
+  income += regionCount * 80;
 
   // Faction bonus for trade-focused
   if (player.faction === 'venice') income = Math.floor(income * 1.25);
@@ -143,12 +148,10 @@ function buildBuilding(player, buildingKey) {
 
 /**
  * Simple battle simulation
- * Returns result object
  */
 function simulateBattle(playerArmy, enemyPower = null) {
-  // Generate enemy if not provided
   if (!enemyPower) {
-    enemyPower = 40 + Math.floor(Math.random() * 80); // 40-120
+    enemyPower = 40 + Math.floor(Math.random() * 80);
   }
 
   let playerPower = 0;
@@ -162,7 +165,6 @@ function simulateBattle(playerArmy, enemyPower = null) {
     const expBonus = (u.experience || 0) * 0.1;
     let unitPower = (def.attack + def.defense + (def.charge || 0)) * count * (1 + expBonus);
 
-    // Type bonuses
     if (def.antiCav) unitPower *= 1.15;
     if (def.range) unitPower *= 1.1;
 
@@ -170,7 +172,6 @@ function simulateBattle(playerArmy, enemyPower = null) {
     details.push(`${def.name} x${count}: ~${Math.floor(unitPower)} силы`);
   }
 
-  // Randomness ±15%
   const playerRoll = playerPower * (0.85 + Math.random() * 0.3);
   const enemyRoll = enemyPower * (0.85 + Math.random() * 0.3);
 
@@ -206,6 +207,28 @@ function applyCasualties(player, percent) {
   savePlayer(player);
 }
 
+/**
+ * Full battle flow: sim + casualties + optional region expansion
+ */
+function resolveBattle(player) {
+  if (!player.regions) player.regions = {};
+
+  const result = simulateBattle(player.army);
+  applyCasualties(player, result.casualtiesPercent);
+
+  let loot = 0;
+  let conquered = null;
+
+  if (result.victory) {
+    loot = 150 + Math.floor(Math.random() * 350);
+    player.florins += loot;
+    conquered = tryExpand(player);
+    savePlayer(player);
+  }
+
+  return { ...result, loot, conquered };
+}
+
 module.exports = {
   calculateIncome,
   calculateUpkeep,
@@ -214,6 +237,7 @@ module.exports = {
   buildBuilding,
   simulateBattle,
   applyCasualties,
+  resolveBattle,
   getPlayer,
   createPlayer,
   savePlayer
